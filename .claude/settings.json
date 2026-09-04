@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_response.filePath // .tool_input.file_path' | { read -r f; [ -f \"$f\" ] || exit 0; case \"$f\" in *.sh|*/bench) shellcheck -e SC1091,SC2119 \"$f\" >&2 || exit 2;; esac; }",
+            "timeout": 30,
+            "statusMessage": "Running shellcheck..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,736 @@
+#!/usr/bin/env bash
+# local-bench -- compare system and Claude performance across your machines.
+#
+#   ./bench build            compile the measurement kernels
+#   ./bench run              measure this host, write results/<run_id>.json
+#   ./bench list             list recorded runs
+#   ./bench show [ref]       print one run
+#   ./bench compare A B      diff two runs
+#   ./bench import <path>    take in a result file from another machine
+#   ./bench db               rebuild results/RESULTS.md from results/*.json
+#   ./bench systems          the systems table: one row per platform
+#   ./bench matrix           platforms x metrics, winner of each row marked
+#   ./bench rank <metric>    rank platforms by one metric
+#
+# A "ref" is a run_id, a hostname (its newest run), "latest", or a file path.
+set -uo pipefail
+
+LB_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export LB_ROOT
+source "$LB_ROOT/lib/common.sh"
+
+LB_DB="$LB_RESULTS/RESULTS.md"
+
+# --- defaults --------------------------------------------------------------
+# Overridable by flag or environment. Duration is per sample; total run time is
+# roughly reps x duration x (number of measurements), so the defaults aim at a
+# few minutes rather than a few seconds -- short samples on a laptop measure
+# the boost clock, not the machine.
+: "${LB_REPS:=3}"
+: "${LB_DURATION:=3}"
+: "${LB_COOLDOWN:=1}"
+: "${LB_CFLAGS:=-O2 -march=native -pipe}"
+: "${LB_NET:=0}"
+: "${LB_CLAUDE:=0}"
+: "${LB_CLAUDE_MODEL:=haiku}"
+export LB_REPS LB_DURATION LB_COOLDOWN LB_CFLAGS LB_NET LB_CLAUDE LB_CLAUDE_MODEL
+
+usage() {
+	# Print the header comment block, stopping at the first line that is not
+	# a comment, so the banner cannot drift out of sync with a line count.
+	awk 'NR > 1 { if (!/^#/) exit; sub(/^# ?/, ""); print }' "$LB_ROOT/bench"
+	cat <<'USAGE'
+
+run options:
+  --tag NAME         label this run (e.g. "battery", "plugged-in")
+  --reps N           samples per measurement            (default 3)
+  --duration SEC     seconds per sample                 (default 3)
+  --cooldown SEC     pause between samples              (default 1)
+  --only  a,b,c      run just these suites
+  --skip  a,b,c      run everything except these suites
+  --net              include external network checks (leaves the machine)
+  --claude           include the Claude suite (uses your Claude quota)
+  --claude-model M   model for the Claude suite         (default haiku)
+  --quick            reps=1 duration=1 cooldown=0
+USAGE
+}
+
+# --- suite discovery -------------------------------------------------------
+
+suite_name() { local b; b=$(basename "$1" .sh); printf '%s' "${b#*-}"; }
+
+list_suites() {
+	local f
+	for f in "$LB_ROOT"/benches/*.sh; do
+		[ -f "$f" ] || continue
+		printf '%s\n' "$f"
+	done | sort
+}
+
+in_csv() {
+	# in_csv <needle> <csv>
+	case ",$2," in *,"$1",*) return 0 ;; esac
+	return 1
+}
+
+# --- build -----------------------------------------------------------------
+
+cmd_build() {
+	local force=0
+	[ "${1:-}" = "--force" ] && force=1
+	mkdir -p "$LB_BUILD"
+
+	local cc="${CC:-cc}"
+	lb_have "$cc" || lb_die "no C compiler found (tried '$cc'; set CC= or install build-essential)"
+
+	local built=0 name src
+	for name in cpu_kernel mem_bw; do
+		src="$LB_ROOT/src/$name.c"
+		[ -f "$src" ] || { lb_warn "missing $src"; continue; }
+		if [ "$force" -eq 0 ] && [ -x "$LB_BUILD/$name" ] && [ "$LB_BUILD/$name" -nt "$src" ]; then
+			lb_say "  ${C_DIM}up to date${C_RESET}  $name"
+			continue
+		fi
+		lb_step "cc $name"
+		# shellcheck disable=SC2086
+		if "$cc" $LB_CFLAGS -o "$LB_BUILD/$name" "$src" -lm; then
+			built=$((built + 1))
+		else
+			lb_die "failed to build $name"
+		fi
+	done
+
+	# CUDA is optional: a machine without it simply reports the gpu suite as
+	# skipped rather than failing the build.
+	src="$LB_ROOT/src/gpu_bench.cu"
+	if [ -f "$src" ]; then
+		if lb_have nvcc || [ -x /usr/local/cuda/bin/nvcc ]; then
+			local nvcc; nvcc=$(command -v nvcc || printf '/usr/local/cuda/bin/nvcc')
+			if [ "$force" -eq 1 ] || [ ! -x "$LB_BUILD/gpu_bench" ] || [ "$src" -nt "$LB_BUILD/gpu_bench" ]; then
+				lb_step "nvcc gpu_bench"
+				"$nvcc" -O2 -o "$LB_BUILD/gpu_bench" "$src" \
+					|| lb_warn "gpu_bench failed to build; the gpu suite will be skipped"
+			else
+				lb_say "  ${C_DIM}up to date${C_RESET}  gpu_bench"
+			fi
+		else
+			lb_say "  ${C_DIM}no nvcc${C_RESET}     gpu_bench (gpu suite will be skipped)"
+		fi
+	fi
+
+	lb_say "${C_GRN}build ok${C_RESET} -> $LB_BUILD"
+}
+
+# --- run -------------------------------------------------------------------
+
+cmd_run() {
+	local tag="" only="" skip=""
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--tag)        tag="${2:?--tag needs a value}"; shift 2 ;;
+			--reps)       LB_REPS="${2:?}"; shift 2 ;;
+			--duration)   LB_DURATION="${2:?}"; shift 2 ;;
+			--cooldown)   LB_COOLDOWN="${2:?}"; shift 2 ;;
+			--only)       only="${2:?}"; shift 2 ;;
+			--skip)       skip="${2:?}"; shift 2 ;;
+			--net)        LB_NET=1; shift ;;
+			--claude)     LB_CLAUDE=1; shift ;;
+			--claude-model) LB_CLAUDE_MODEL="${2:?}"; shift 2 ;;
+			--quick)      LB_REPS=1; LB_DURATION=1; LB_COOLDOWN=0; shift ;;
+			-h|--help)    usage; return 0 ;;
+			*)            lb_die "unknown option for run: $1" ;;
+		esac
+	done
+	export LB_REPS LB_DURATION LB_COOLDOWN LB_NET LB_CLAUDE LB_CLAUDE_MODEL
+
+	[ -x "$LB_BUILD/cpu_kernel" ] || lb_warn "kernels not built; run './bench build' first"
+
+	mkdir -p "$LB_RESULTS"
+	local host started run_id
+	host=$(hostname 2>/dev/null || printf 'unknown')
+	started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	run_id="$(date -u +%Y%m%dT%H%M%SZ)-${host}"
+
+	LB_OUT=$(mktemp "${TMPDIR:-/tmp}/lb-out.XXXXXX") || lb_die "cannot create temp file"
+	export LB_OUT
+	trap 'rm -f "$LB_OUT"' EXIT
+
+	lb_say "${C_BOLD}local-bench${C_RESET} $run_id  ${C_DIM}reps=$LB_REPS duration=${LB_DURATION}s${C_RESET}"
+
+	# Thermal state is sampled around the whole run: a machine that throttled
+	# mid-run produced numbers that should not be compared with a cool one.
+	local thr_before thr_after temp_before temp_after
+	thr_before=$(lb_throttle_count)
+	temp_before=$(lb_cpu_temp_c)
+
+	local f name t0 t1
+	for f in $(list_suites); do
+		name=$(suite_name "$f")
+		if [ -n "$only" ] && ! in_csv "$name" "$only"; then continue; fi
+		if [ -n "$skip" ] && in_csv "$name" "$skip"; then
+			lb_say "  ${C_DIM}skipped${C_RESET}    $name ${C_DIM}(--skip)${C_RESET}"
+			lb_status "$name" skip "excluded by --skip"
+			continue
+		fi
+		lb_step "$name"
+		t0=$(date +%s)
+		bash "$f"
+		t1=$(date +%s)
+		lb_say "  ${C_DIM}$((t1 - t0))s${C_RESET}"
+	done
+
+	thr_after=$(lb_throttle_count)
+	temp_after=$(lb_cpu_temp_c)
+	lb_info cpu_temp_start_c "$temp_before"
+	lb_info cpu_temp_end_c "$temp_after"
+	if [ "$thr_after" -gt "$thr_before" ] 2>/dev/null; then
+		lb_info throttle_events "$((thr_after - thr_before))"
+		lb_note "CPU thermal throttling occurred during this run ($((thr_after - thr_before)) events); treat CPU figures as a floor"
+	fi
+	lb_info bench_tool_version "1"
+
+	local finished out
+	finished=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+	out="$LB_RESULTS/$run_id.json"
+	awk -f "$LB_ROOT/lib/tojson.awk" \
+		-v run_id="$run_id" -v tag="$tag" \
+		-v started="$started" -v finished="$finished" \
+		-v reps="$LB_REPS" -v duration="$LB_DURATION" -v cooldown="$LB_COOLDOWN" \
+		"$LB_OUT" > "$out" || lb_die "failed to write $out"
+
+	lb_say "${C_GRN}wrote${C_RESET} $out"
+	cmd_db >/dev/null
+	lb_say "${C_GRN}db${C_RESET}    $LB_DB"
+	cmd_show "$out"
+}
+
+# --- reading results -------------------------------------------------------
+
+# Resolve a user-supplied ref to a result file path.
+lb_resolve_run() {
+	local ref="${1:-latest}" f
+	if [ -f "$ref" ]; then printf '%s' "$ref"; return 0; fi
+	if [ -f "$LB_RESULTS/$ref.json" ]; then printf '%s' "$LB_RESULTS/$ref.json"; return 0; fi
+	if [ "$ref" = "latest" ]; then
+		f=$(lb_result_files | tail -1)
+		[ -n "$f" ] && { printf '%s' "$f"; return 0; }
+		return 1
+	fi
+	# Hostname: flat run_ids end in -<host>, and the per-host layout puts the
+	# host in the directory name. Newest match wins either way.
+	f=$( { ls -1 "$LB_RESULTS"/*-"$ref".json 2>/dev/null
+	       ls -1 "$LB_RESULTS/$ref"/*.json 2>/dev/null; } \
+	     | awk '{ n = $0; sub(/.*\//, "", n); print n "\t" $0 }' | sort | cut -f2- | tail -1)
+	[ -n "$f" ] && { printf '%s' "$f"; return 0; }
+	return 1
+}
+
+# Result files live either flat (results/<run_id>.json, what this runner writes)
+# or one directory per host (results/<host>/<ts>.json). Both are read, so
+# results produced by another tool or organised by hand still show up.
+# Both layouts start the filename with the run's UTC timestamp, so ordering by
+# basename orders by time regardless of how deep the file sits.
+lb_result_files() {
+	{ ls -1 "$LB_RESULTS"/*.json 2>/dev/null
+	  ls -1 "$LB_RESULTS"/*/*.json 2>/dev/null; } \
+	| awk '{ n = $0; sub(/.*\//, "", n); print n "\t" $0 }' \
+	| sort | awk -F'\t' '!seen[$1]++' | cut -f2-
+}
+
+flatten() { awk -f "$LB_ROOT/lib/fromjson.awk" "$1"; }
+
+cmd_list() {
+	local n; n=$(lb_result_files | wc -l)
+	[ "$n" -gt 0 ] || { lb_say "no runs yet -- try './bench run'"; return 0; }
+	printf '%-34s  %-12s  %-20s  %s\n' "RUN_ID" "HOST" "STARTED (UTC)" "TAG"
+	local f
+	for f in $(lb_result_files); do
+		flatten "$f" | awk -F'\t' '
+			$1 == "H" && $2 == "hostname" { host = $3 }
+			$1 == "R" { id = $2; tag = $3; started = $4 }
+			END { printf "%-34s  %-12s  %-20s  %s\n", id, host, started, tag }'
+	done
+}
+
+cmd_show() {
+	local f; f=$(lb_resolve_run "${1:-latest}") || lb_die "no run matching '${1:-latest}'"
+	flatten "$f" | awk -F'\t' -v c_b="$C_BOLD" -v c_d="$C_DIM" -v c_r="$C_RESET" \
+		-v c_y="$C_YEL" -v c_g="$C_GRN" -v c_e="$C_RED" '
+		$1 == "R" { id=$2; tag=$3; started=$4 }
+		$1 == "H" { hk[++nh]=$2; hv[$2]=$3 }
+		$1 == "S" { so[++ns]=$2; st[$2]=$3; note[$2]=$4 }
+		$1 == "M" { s=$2; mo[s, ++nm[s]]=$3; u[s,$3]=$4; md[s,$3]=$6; sp[s,$3]=$7; hb[s,$3]=$5 }
+		$1 == "W" { w[++nw]=$2 }
+		END {
+			printf "\n%s%s%s  %s%s%s\n", c_b, id, c_r, c_d, started " " tag, c_r
+			printf "%s%s  %s  %s cores  %s MiB%s\n", c_d,
+				hv["os"], hv["cpu_model"], hv["cpu_threads"], hv["mem_total_mib"], c_r
+			if (hv["gpu_name"] != "") printf "%s%s  %s%s\n", c_d, hv["gpu_name"], hv["gpu_mem"], c_r
+			printf "\n"
+			for (i = 1; i <= ns; i++) {
+				s = so[i]
+				col = (st[s] == "ok") ? c_g : ((st[s] == "skip") ? c_y : c_e)
+				printf "%s%-14s%s %s%s%s", c_b, s, c_r, col, st[s], c_r
+				if (note[s] != "") printf "  %s%s%s", c_d, note[s], c_r
+				printf "\n"
+				for (j = 1; j <= nm[s]; j++) {
+					m = mo[s, j]
+					arrow = (hb[s,m] == "true") ? "^" : "v"
+					printf "  %-24s %12.4g %-8s %s+-%.1f%% %s%s\n",
+						m, md[s,m]+0, u[s,m], c_d, sp[s,m]+0, arrow, c_r
+				}
+			}
+			for (i = 1; i <= nw; i++) printf "\n%s! %s%s\n", c_y, w[i], c_r
+		}'
+}
+
+# --- markdown database -----------------------------------------------------
+# results/RESULTS.md is regenerated wholesale from results/*.json rather than
+# appended to, so it can never drift from the underlying runs and an imported
+# file from another machine lands in it the same way a local run does.
+
+cmd_db() {
+	mkdir -p "$LB_RESULTS"
+	local tmp; tmp=$(mktemp "${TMPDIR:-/tmp}/lb-db.XXXXXX") || lb_die "cannot create temp file"
+	local rec; rec=$(mktemp "${TMPDIR:-/tmp}/lb-rec.XXXXXX") || lb_die "cannot create temp file"
+
+	# Stage every run into one tab-separated stream, each record carrying the
+	# run_id and host it came from.
+	local f id host seen_ids=""
+	for f in $(lb_result_files); do
+		flatten "$f" > "$tmp"
+		id=$(awk -F'\t' '$1=="R"{print $2; exit}' "$tmp")
+		host=$(awk -F'\t' '$1=="H" && $2=="hostname"{print $3; exit}' "$tmp")
+		[ -n "$id" ] || continue
+		# The same run can be reachable by two paths (imported flat and also
+		# present under results/<host>/); record it once.
+		case " $seen_ids " in *" $id "*) continue ;; esac
+		seen_ids="${seen_ids:-} $id"
+		awk -F'\t' -v id="$id" -v host="${host:-unknown}" 'BEGIN{OFS="\t"}
+			{ $1 = $1; print id, host, $0 }' "$tmp"
+	done > "$rec"
+
+	{
+		cat <<'HEADER'
+# local-bench results
+
+Regenerated by `./bench db` from every `results/*.json`. **Do not edit by hand** --
+edits are overwritten on the next run. To add a machine's results, copy its JSON
+into `results/` (or `./bench import <file>`) and re-run `./bench db`.
+
+Metric direction: `^` means higher is better, `v` means lower is better.
+`spread%` is (max-min)/median across samples -- above roughly 10% the machine was
+too noisy for that number to be worth comparing.
+
+HEADER
+		awk -F'\t' -f "$LB_ROOT/lib/mkdb.awk" "$rec"
+	} > "$LB_DB"
+
+	rm -f "$tmp" "$rec"
+	printf '%s\n' "$LB_DB"
+}
+
+# --- compare ---------------------------------------------------------------
+
+cmd_compare() {
+	[ $# -ge 2 ] || lb_die "usage: bench compare <ref-a> <ref-b>"
+	local a b
+	a=$(lb_resolve_run "$1") || lb_die "no run matching '$1'"
+	b=$(lb_resolve_run "$2") || lb_die "no run matching '$2'"
+	[ "$a" = "$b" ] && lb_warn "both refs resolved to the same run"
+
+	local ta tb; ta=$(mktemp); tb=$(mktemp)
+	flatten "$a" > "$ta"; flatten "$b" > "$tb"
+
+	awk -F'\t' -v c_b="$C_BOLD" -v c_d="$C_DIM" -v c_r="$C_RESET" \
+		-v c_g="$C_GRN" -v c_e="$C_RED" -v c_y="$C_YEL" '
+		FNR == NR {
+			if ($1 == "R") { aid = $2 }
+			if ($1 == "H") { ah[$2] = $3 }
+			if ($1 == "M") { k = $2 SUBSEP $3; av[k] = $6; asp[k] = $7
+				if (!(k in seen)) { seen[k] = 1; ord[++n] = k
+					suite[k] = $2; metric[k] = $3; unit[k] = $4; hib[k] = $5 } }
+			next
+		}
+		{
+			if ($1 == "R") { bid = $2 }
+			if ($1 == "H") { bh[$2] = $3 }
+			if ($1 == "M") { k = $2 SUBSEP $3; bv[k] = $6; bsp[k] = $7
+				if (!(k in seen)) { seen[k] = 1; ord[++n] = k
+					suite[k] = $2; metric[k] = $3; unit[k] = $4; hib[k] = $5 } }
+		}
+		END {
+			printf "\n%sA%s %s  %s%s / %s%s\n", c_b, c_r, aid, c_d, ah["hostname"], ah["cpu_model"], c_r
+			printf "%sB%s %s  %s%s / %s%s\n\n", c_b, c_r, bid, c_d, bh["hostname"], bh["cpu_model"], c_r
+			printf "%s%-12s %-22s %14s %14s %10s%s\n", c_b, "SUITE", "METRIC", "A", "B", "B vs A", c_r
+
+			awins = 0; bwins = 0
+			for (i = 1; i <= n; i++) {
+				k = ord[i]
+				if (!(k in av) || !(k in bv)) {
+					printf "%-12s %-22s %14s %14s %10s\n", suite[k], metric[k],
+						(k in av ? sprintf("%.4g", av[k]) : "-"),
+						(k in bv ? sprintf("%.4g", bv[k]) : "-"), "n/a"
+					continue
+				}
+				x = av[k] + 0; y = bv[k] + 0
+				if (x == 0) { pct = 0 } else { pct = (y - x) / x * 100 }
+				# Direction-aware: for a lower-is-better metric a negative
+				# percentage change is an improvement.
+				better = (hib[k] == "true") ? (y > x) : (y < x)
+				same = (pct > -1.0 && pct < 1.0)
+				col = same ? c_d : (better ? c_g : c_e)
+				if (!same) { if (better) bwins++; else awins++ }
+				printf "%-12s %-22s %14.4g %14.4g %s%+9.1f%%%s  %s%s%s\n",
+					suite[k], metric[k], x, y, col, pct, c_r, c_d, unit[k], c_r
+			}
+			printf "\n%sB is faster on %d metrics, A on %d (differences under 1%% ignored).%s\n",
+				c_d, bwins, awins, c_r
+		}' "$ta" "$tb"
+
+	rm -f "$ta" "$tb"
+}
+
+# --- import ----------------------------------------------------------------
+
+cmd_import() {
+	[ $# -ge 1 ] || lb_die "usage: bench import <file.json|dir>"
+	mkdir -p "$LB_RESULTS"
+	local src n=0 f base
+	for src in "$@"; do
+		if [ -d "$src" ]; then
+			for f in "$src"/*.json; do [ -f "$f" ] && { cmd_import_one "$f" && n=$((n + 1)); }; done
+		elif [ -f "$src" ]; then
+			cmd_import_one "$src" && n=$((n + 1))
+		else
+			lb_warn "not found: $src"
+		fi
+	done
+	[ "$n" -gt 0 ] && cmd_db >/dev/null
+	lb_say "imported $n run(s); db is $LB_DB"
+}
+
+cmd_import_one() {
+	local f="$1" id base
+	id=$(flatten "$f" | awk -F'\t' '$1=="R"{print $2; exit}')
+	[ -n "$id" ] || { lb_warn "$f is not a local-bench result file"; return 1; }
+	base="$LB_RESULTS/$id.json"
+	if [ -e "$base" ] && ! cmp -s "$f" "$base"; then
+		lb_warn "$id already exists with different content; keeping the existing copy"
+		return 1
+	fi
+	cp -- "$f" "$base" || return 1
+	lb_say "  + $id"
+	return 0
+}
+
+# --- systems -----------------------------------------------------------------
+#
+# Two linked tables rather than one blob per run:
+#
+#   systems   one row per PLATFORM  (cpu / memory / disk / bandwidth)
+#   runs      every measurement, carrying the system it ran on
+#
+# The link is system_id, a hash of host facts every run already records
+# (lib/sysid.sh), so runs written before this existed still join correctly and
+# nothing has to be migrated.
+
+source "$LB_ROOT/lib/sysid.sh"
+
+# Metrics worth putting on a leaderboard, as "label|suite/metric". Order is the
+# order they appear. Anything not measured on any system is dropped from the
+# table rather than shown as a column of dashes.
+LB_HEADLINES='CPU 1-core|cpu-single/int
+CPU all-core|cpu-multi/threads_all
+CPU scaling|cpu-multi/scaling_efficiency
+Crypto AES-256|crypto/aes_256_cbc
+Memory bandwidth|memory/copy
+Memory latency|memory/latency
+Disk read|disk/seq_read
+Disk write|disk/seq_write
+Disk fsync|disk/fsync_latency
+GPU FP32|gpu/fp32
+GPU transfer|gpu/h2d
+Net loopback|network/pipe_throughput
+Claude startup|claude/cli_startup
+Claude TTFT|claude/ttft
+Claude output|claude/output_tok_per_sec
+Claude total|claude/total_roundtrip'
+
+# Emit every run as one stream, each record prefixed with its system_id.
+stage_systems() {
+	local f tmp id host sid fp seen=""
+	tmp=$(mktemp "${TMPDIR:-/tmp}/lb-stage.XXXXXX") || lb_die "cannot create temp file"
+	for f in $(lb_result_files); do
+		flatten "$f" > "$tmp"
+		id=$(awk -F'\t' '$1=="R"{print $2; exit}' "$tmp")
+		[ -n "$id" ] || continue
+		# The same run is reachable by two paths when it is both imported
+		# flat and present under results/<host>/; count it once.
+		case " $seen " in *" $id "*) continue ;; esac
+		seen="$seen $id"
+		fp=$(lb_system_of_flat "$tmp")
+		sid=$(lb_hash "$fp")
+		host=$(awk -F'\t' '$1=="H"&&$2=="hostname"{print $3; exit}' "$tmp")
+		awk -F'\t' -v s="$sid" -v i="$id" -v h="${host:-unknown}" \
+			'BEGIN{OFS="\t"} {$1=$1; print s, i, h, $0}' "$tmp"
+	done
+	rm -f "$tmp"
+}
+
+systems_data() { stage_systems | awk -F'\t' -f "$LB_ROOT/lib/systems.awk"; }
+
+cmd_systems() {
+	local data; data=$(systems_data)
+	[ -n "$data" ] || { lb_say "no runs yet -- try './bench run'"; return 0; }
+	printf '%s\n' "$data" | awk -F'\t' -v b="$C_BOLD" -v d="$C_DIM" -v r="$C_RESET" '
+		$1 == "META" {
+			n = ++ns; sid[n] = $2; plat[n] = $3; host[n] = $4
+			os[n] = $5; runs[n] = $6; first[n] = $7; last[n] = $8
+		}
+		$1 == "SPEC" { spec[$2, $3] = $4 }
+		$1 == "CAP"  { cap[$2, $3] = $6; unit[$2, $3] = $4 }
+		END {
+			for (i = 1; i <= ns; i++) {
+				s = sid[i]
+				printf "%s%s%s  %s%s / %s%s\n", b, s, r, "", host[i], plat[i], ""
+				printf "  %-14s %s\n", "os", os[i]
+				printf "  %-14s %s  (%s cores / %s threads", "cpu",
+					spec[s, "cpu_model"], spec[s, "cpu_cores"], spec[s, "cpu_threads"]
+				if (spec[s, "cpu_mhz_max"] != "") printf ", max %s MHz", spec[s, "cpu_mhz_max"]
+				printf ")\n"
+				printf "  %-14s %s MiB", "memory", spec[s, "mem_total_mib"]
+				if (cap[s, "memory/copy"] != "")
+					printf "  (%.3g %s measured)", cap[s, "memory/copy"], unit[s, "memory/copy"]
+				printf "\n"
+				printf "  %-14s %s on %s", "disk", spec[s, "root_fs"], spec[s, "root_dev"]
+				if (cap[s, "disk/seq_read"] != "")
+					printf "  (read %.4g / write %.4g MB/s measured)",
+						cap[s, "disk/seq_read"], cap[s, "disk/seq_write"]
+				printf "\n"
+				if (spec[s, "gpu_name"] != "") {
+					printf "  %-14s %s (%s)", "gpu", spec[s, "gpu_name"], spec[s, "gpu_mem"]
+					if (cap[s, "gpu/fp32"] != "") printf "  (%.4g GFLOPS measured)", cap[s, "gpu/fp32"]
+					printf "\n"
+				}
+				printf "%s  %-14s %s run(s), %s .. %s%s\n\n", d, "history",
+					runs[i], first[i], last[i], r
+			}
+		}'
+}
+
+# The leaderboard: metrics down the side, platforms across the top, winner of
+# each row marked. This is the view that answers "which platform runs this
+# best" without having to open two files and subtract.
+cmd_matrix() {
+	local data; data=$(systems_data)
+	[ -n "$data" ] || { lb_say "no runs yet -- try './bench run'"; return 0; }
+	printf '%s\n' "$data" | awk -F'\t' -v headlines="$LB_HEADLINES" \
+		-v b="$C_BOLD" -v d="$C_DIM" -v g="$C_GRN" -v r="$C_RESET" '
+		# Platform names vary in length; clip them to the column so long
+		# names cannot run into the next heading.
+		function fit(s, w) { return (length(s) >= w) ? substr(s, 1, w - 2) "~" : s }
+		BEGIN {
+			nh = split(headlines, hl, "\n")
+			for (i = 1; i <= nh; i++) {
+				split(hl[i], p, "|")
+				label[i] = p[1]; mkey[i] = p[2]
+			}
+		}
+		$1 == "META" { n = ++ns; sid[n] = $2; name[n] = $4 "/" $3; runs[$2] = $6 }
+		$1 == "CAP"  { cap[$2, $3] = $6; unit[$3] = $4; hib[$3] = $5; have[$3] = 1 }
+		END {
+			if (ns == 0) exit
+			w = 19
+			printf "\n  %-16s %-9s", "METRIC", "UNIT"
+			for (j = 1; j <= ns; j++) printf "%s%*s%s", b, w, fit(name[j], w), r
+			printf "\n  %-16s %-9s", "----------------", "---------"
+			for (j = 1; j <= ns; j++) printf "%*s", w, "-----------------"
+			printf "\n"
+
+			for (i = 1; i <= nh; i++) {
+				k = mkey[i]
+				if (!have[k]) continue          # nothing measured it anywhere
+				# Find the winner for this row, respecting direction.
+				bestv = ""; bestj = 0
+				for (j = 1; j <= ns; j++) {
+					if (!((sid[j] SUBSEP k) in cap)) continue
+					v = cap[sid[j], k] + 0
+					if (bestv == "" || (hib[k] == "true" ? v > bestv : v < bestv)) {
+						bestv = v; bestj = j
+					}
+				}
+				printf "  %-16s %-9s", label[i], unit[k]
+				for (j = 1; j <= ns; j++) {
+					if (!((sid[j] SUBSEP k) in cap)) { printf "%*s", w, "-"; continue }
+					v = cap[sid[j], k] + 0
+					if (j == bestj && ns > 1)
+						printf "%s%*s%s", g, w, sprintf("%.4g *", v), r
+					else
+						printf "%*s", w, sprintf("%.4g", v)
+				}
+				printf "\n"
+			}
+			printf "\n%s  * best in row.  values are the median across runs per platform", d
+			printf "\n  runs per platform:"
+			for (j = 1; j <= ns; j++) printf " %s=%s", name[j], runs[sid[j]]
+			printf "%s\n\n", r
+		}'
+}
+
+# Rank every platform by one metric.
+cmd_rank() {
+	local metric="${1:-}"
+	local data; data=$(systems_data)
+	[ -n "$data" ] || { lb_say "no runs yet -- try './bench run'"; return 0; }
+	if [ -z "$metric" ]; then
+		lb_say "usage: ./bench rank <suite/metric>"
+		lb_say ""
+		lb_say "measured metrics:"
+		printf '%s\n' "$data" | awk -F'\t' '$1=="CAP"{print "  " $3}' | sort -u >&2
+		return 2
+	fi
+	printf '%s\n' "$data" | awk -F'\t' -v want="$metric" \
+		-v b="$C_BOLD" -v d="$C_DIM" -v g="$C_GRN" -v r="$C_RESET" '
+		$1 == "META" { name[$2] = $4 "/" $3 }
+		$1 == "CAP" && $3 == want {
+			n = ++c; s[n] = $2; med[n] = $6 + 0; best[n] = $7 + 0; nr[n] = $8
+			unit = $4; hib = $5
+		}
+		END {
+			if (c == 0) { print "no system has measured " want > "/dev/stderr"; exit 1 }
+			# Sort into ranking order for this metric direction.
+			for (i = 2; i <= c; i++) {
+				for (j = i; j > 1; j--) {
+					sw = (hib == "true") ? (med[j] > med[j-1]) : (med[j] < med[j-1])
+					if (!sw) break
+					t = med[j]; med[j] = med[j-1]; med[j-1] = t
+					t = best[j]; best[j] = best[j-1]; best[j-1] = t
+					t = s[j]; s[j] = s[j-1]; s[j-1] = t
+					t = nr[j]; nr[j] = nr[j-1]; nr[j-1] = t
+				}
+			}
+			printf "\n  %s%s%s  (%s, %s is better)\n\n", b, want, r, unit,
+				(hib == "true" ? "higher" : "lower")
+			printf "  %-3s %-28s %12s %12s %6s %8s\n", "#", "PLATFORM", "MEDIAN", "BEST", "RUNS", "vs #1"
+			for (i = 1; i <= c; i++) {
+				rel = (med[1] != 0) ? (med[i] / med[1] * 100) : 0
+				if (hib != "true" && med[i] != 0) rel = med[1] / med[i] * 100
+				printf "  %s%-3d%s %-28s %12.4g %12.4g %6s %7.0f%%\n",
+					(i == 1 ? g : ""), i, (i == 1 ? r : ""),
+					name[s[i]], med[i], best[i], nr[i], rel
+			}
+			printf "\n"
+		}'
+}
+
+# results/SYSTEMS.md is part one of the database: one row per platform, with
+# the measured capability joined on. It is regenerated wholesale from the runs,
+# never appended to, so it cannot drift from the JSON it summarises.
+cmd_sysdb() {
+	local out="$LB_RESULTS/SYSTEMS.md"
+	local data; data=$(systems_data)
+	if [ -z "$data" ]; then lb_say "no runs yet -- try './bench run'"; return 0; fi
+	mkdir -p "$LB_RESULTS"
+	local tmp; tmp=$(mktemp "${TMPDIR:-/tmp}/lb-sysdb.XXXXXX") || lb_die "cannot create temp file"
+	{
+		cat <<'HEADER'
+# Systems
+
+Part one of the database: one row per **platform**, not per machine. The same
+hardware running Debian bare-metal, a Crostini container and ChromeOS Flex is
+three rows, because telling those apart is the point of the comparison.
+
+`system_id` is a hash of the identifying host facts (hostname, OS, arch, CPU
+model, thread count, memory rounded to GiB, platform). Every run in
+[RESULTS.md](RESULTS.md) joins to a row here by that id. It is derived, not
+stored, so runs recorded before this table existed still join correctly.
+
+Regenerated by `./bench sysdb`. **Do not edit by hand.**
+
+## Platforms
+
+HEADER
+		printf '%s\n' "$data" | awk -F'\t' '
+			$1 == "META" { n=++ns; sid[n]=$2; plat[n]=$3; host[n]=$4; os[n]=$5; runs[n]=$6; last[n]=$8 }
+			$1 == "SPEC" { spec[$2,$3]=$4 }
+			END {
+				print "| system_id | host | platform | os | cpu | cores/threads | memory | disk | gpu | runs | last seen |"
+				print "|---|---|---|---|---|---|---|---|---|---|---|"
+				for (i=1;i<=ns;i++) {
+					s=sid[i]
+					gpu = (spec[s,"gpu_name"] != "") ? spec[s,"gpu_name"] : "-"
+					printf "| `%s` | %s | %s | %s | %s | %s/%s | %s MiB | %s on %s | %s | %s | %s |\n",
+						s, host[i], plat[i], os[i], spec[s,"cpu_model"],
+						spec[s,"cpu_cores"], spec[s,"cpu_threads"],
+						spec[s,"mem_total_mib"],
+						spec[s,"root_fs"], spec[s,"root_dev"], gpu, runs[i], last[i]
+				}
+			}'
+		cat <<'MID'
+
+## Measured capability
+
+Median across every run on that platform. This is the join: hardware facts
+above, real numbers below, linked by `system_id`.
+
+MID
+		printf '%s\n' "$data" | awk -F'\t' -v headlines="$LB_HEADLINES" '
+			BEGIN {
+				nh = split(headlines, hl, "\n")
+				for (i=1;i<=nh;i++) { split(hl[i], p, "|"); label[i]=p[1]; mkey[i]=p[2] }
+			}
+			$1 == "META" { n=++ns; sid[n]=$2; name[n]=$4 "/" $3 }
+			$1 == "CAP"  { cap[$2,$3]=$6; unit[$3]=$4; hib[$3]=$5; have[$3]=1 }
+			END {
+				printf "| metric | unit |"
+				for (j=1;j<=ns;j++) printf " %s |", name[j]
+				printf "\n|---|---|"
+				for (j=1;j<=ns;j++) printf "---|"
+				printf "\n"
+				for (i=1;i<=nh;i++) {
+					k=mkey[i]
+					if (!have[k]) continue
+					bestv=""; bestj=0
+					for (j=1;j<=ns;j++) {
+						if (!((sid[j] SUBSEP k) in cap)) continue
+						v=cap[sid[j],k]+0
+						if (bestv=="" || (hib[k]=="true" ? v>bestv : v<bestv)) { bestv=v; bestj=j }
+					}
+					printf "| %s | %s |", label[i], unit[k]
+					for (j=1;j<=ns;j++) {
+						if (!((sid[j] SUBSEP k) in cap)) { printf " - |"; continue }
+						# Bold marks the winning platform for that row.
+						if (j==bestj && ns>1) printf " **%.4g** |", cap[sid[j],k]+0
+						else printf " %.4g |", cap[sid[j],k]+0
+					}
+					printf "\n"
+				}
+				printf "\nDirection: higher is better except latency, fsync and the Claude timings, where lower wins.\n"
+			}'
+	} > "$tmp"
+	# Atomic replace: a reader never sees a half-written table, and a
+	# concurrent writer cannot corrupt this file mid-read.
+	mv -f "$tmp" "$out"
+	printf '%s\n' "$out"
+}
+
+# --- dispatch --------------------------------------------------------------
+
+cmd="${1:-}"; shift 2>/dev/null || true
+case "$cmd" in
+	build)   cmd_build "$@" ;;
+	systems) cmd_systems "$@" ;;
+	sysdb)   cmd_sysdb "$@" ;;
+	matrix)  cmd_matrix "$@" ;;
+	rank)    cmd_rank "$@" ;;
+	run)     cmd_run "$@" ;;
+	list)    cmd_list "$@" ;;
+	show)    cmd_show "$@" ;;
+	compare|diff) cmd_compare "$@" ;;
+	import)  cmd_import "$@" ;;
+	db)      cmd_db "$@" ;;
+	suites)  for f in $(list_suites); do suite_name "$f"; echo; done ;;
+	""|-h|--help|help) usage ;;
+	*)       lb_err "unknown command: $cmd"; usage; exit 2 ;;
+esac

@@ -1,0 +1,6 @@
+# Compiled measurement kernels: built with -march=native, so they are specific
+# to the machine that built them and must not be shared between hosts.
+build/
+
+# Scratch directory the disk suite creates and deletes during a run.
+.disktmp/
