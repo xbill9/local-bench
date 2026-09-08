@@ -13,6 +13,7 @@ too noisy for that number to be worth comparing.
 | host | os | platform | cpu | threads | mem MiB | gpu | runs | latest run |
 |---|---|---|---|---|---|---|---|---|
 | yoga9i | Debian GNU/Linux 13 (trixie) | bare metal | Intel Core i7-10750H | 12 | 15663 | NVIDIA GeForce GTX 1650 Ti with Max-Q Design | 3 | `20260904T141502Z-yoga9i` |
+| debian | Debian GNU/Linux 13 (trixie) | bare metal | 13th Gen Intel Core i7-1360P | 16 | 15731 | - | 1 | `20260908T165649Z-debian` |
 
 ## Runs
 
@@ -21,6 +22,7 @@ too noisy for that number to be worth comparing.
 | `20260904T140703Z` | 2026-09-04T14:07:03Z | yoga9i | smoke | 1 | 1 | 8 | 0 | 0 |
 | `20260904T140830Z` | 2026-09-04T14:08:30Z | yoga9i | baseline | 3 | 3 | 8 | 0 | 0 |
 | `20260904T141502Z-yoga9i` | 2026-09-04T14:15:02Z | yoga9i | baseline-native | 3 | 3 | 9 | 0 | 0 |
+| `20260908T165649Z-debian` | 2026-09-08T16:56:49Z | debian | - | 3 | 3 | 7 | 2 | 0 |
 
 ## Measurements
 
@@ -107,6 +109,23 @@ too noisy for that number to be worth comparing.
 | `20260904T141502Z-yoga9i` | yoga9i | claude | total_roundtrip | 1290 | ms | v | 10.6 | 3 |
 | `20260904T141502Z-yoga9i` | yoga9i | claude | api_duration | 1943 | ms | v | 18.0 | 3 |
 | `20260904T141502Z-yoga9i` | yoga9i | claude | output_tok_per_sec | 233.08 | tok/s | ^ | 159.3 | 3 |
+| `20260908T165649Z-debian` | debian | cpu-single | int | 5.50911e+08 | ops/s | ^ | 0.6 | 3 |
+| `20260908T165649Z-debian` | debian | cpu-single | float | 4.92688e+09 | ops/s | ^ | 1.0 | 3 |
+| `20260908T165649Z-debian` | debian | cpu-single | sieve | 6.24263e+08 | ops/s | ^ | 3.3 | 3 |
+| `20260908T165649Z-debian` | debian | cpu-multi | threads_1 | 5.49027e+08 | ops/s | ^ | 1.4 | 3 |
+| `20260908T165649Z-debian` | debian | cpu-multi | threads_all | 6.3626e+09 | ops/s | ^ | 1.9 | 3 |
+| `20260908T165649Z-debian` | debian | cpu-multi | scaling_efficiency | 72.43 | % | ^ | 0.0 | 1 |
+| `20260908T165649Z-debian` | debian | memory | read | 23.2768 | GiB/s | ^ | 2.8 | 3 |
+| `20260908T165649Z-debian` | debian | memory | write | 14.4146 | GiB/s | ^ | 1.2 | 3 |
+| `20260908T165649Z-debian` | debian | memory | copy | 46.0446 | GiB/s | ^ | 4.2 | 3 |
+| `20260908T165649Z-debian` | debian | memory | triad | 23.8136 | GiB/s | ^ | 0.8 | 3 |
+| `20260908T165649Z-debian` | debian | memory | latency | 90.1722 | ns | v | 1.0 | 3 |
+| `20260908T165649Z-debian` | debian | disk | seq_write | 3600 | MB/s | ^ | 5.6 | 3 |
+| `20260908T165649Z-debian` | debian | disk | seq_read | 5400 | MB/s | ^ | 3.7 | 3 |
+| `20260908T165649Z-debian` | debian | disk | fsync_latency | 0.50698 | ms | v | 11.6 | 3 |
+| `20260908T165649Z-debian` | debian | crypto | sha256 | 2396.3 | MB/s | ^ | 0.4 | 3 |
+| `20260908T165649Z-debian` | debian | crypto | aes_256_cbc | 1771.83 | MB/s | ^ | 0.1 | 3 |
+| `20260908T165649Z-debian` | debian | network | pipe_throughput | 4600 | MB/s | ^ | 15.2 | 3 |
 
 ## Warnings
 
