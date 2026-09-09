@@ -1,0 +1,46 @@
+You are running natively on a cloud VM. Analyse THIS machine you are on and
+report findings. Use your Bash tool. Do not guess -- run commands and cite what
+they returned. Where a command needs root, use sudo.
+
+Cover these seven areas, in this order, with a heading for each:
+
+1. IDENTITY. Cloud platform, instance type, region, image, kernel, CPU model
+   and topology, RAM, virtualisation type. Prefer the platform's own metadata
+   service and /sys/class/dmi/id over guesswork.
+
+2. DRIVERS. Enumerate every PCI device and whether a kernel driver is bound.
+   List explicitly any device with NO driver bound, and for each say whether
+   that is expected (emulated legacy chipset under a hypervisor) or a real gap.
+   Note which network and storage drivers are in use.
+
+3. FIRMWARE. Search the kernel log for firmware load attempts, successes and
+   failures. Report the microcode revision and whether the hypervisor masks it.
+   State whether any firmware package is installed at all. Distinguish a real
+   missing-firmware failure from benign debug-only firmware that is never
+   shipped.
+
+4. KERNEL ERRORS. Report kernel taint value. Grep the kernel log for errors,
+   warnings, failures and ACPI problems. Count repeats rather than listing
+   every line. For each distinct message say whether it is benign and why.
+
+5. FAILED UNITS. Any failed or degraded systemd units, and any service that
+   repeatedly restarted during boot.
+
+6. SYSTEM TOOLS. Which hardware-observability tools are present vs absent.
+   IMPORTANT: check with an explicit PATH that includes /usr/sbin, /sbin and
+   /usr/local/sbin, and cross-check against dpkg -- a tool in /usr/sbin is NOT
+   missing just because a bare `command -v` under a login PATH cannot see it.
+   This exact mistake has already been made once in this project.
+
+7. GAPS. The point of the exercise: hardware or kernel facilities that are
+   PRESENT on this machine but that the installed toolset cannot observe or
+   control. For each, name the package that would close it. Also list
+   instrumentation that is simply ABSENT from this VM (no thermal zones, no
+   RAPL, etc.) and say whether that is the hypervisor hiding it or the
+   hardware genuinely lacking it -- and how you can tell the difference.
+
+Finish with a section headed VERDICT: at most eight lines, the things a
+sysadmin would actually act on, most important first. If there is nothing to
+act on, say so plainly rather than padding.
+
+Be concise and factual. No preamble. Report what you measured.

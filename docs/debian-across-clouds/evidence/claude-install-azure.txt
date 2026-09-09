@@ -1,0 +1,31 @@
+Setting up Claude Code...
+
+Checking installation status...
+Installing Claude Code native build latest...
+Setting up launcher and shell integration...
+⚠ Setup notes:
+  ● Native installation exists but ~/.local/bin is not in your PATH. Run:
+
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+
+✔ Claude Code successfully installed!
+
+  Version: 2.1.266
+
+  Location: ~/.local/bin/claude
+
+
+  Next: Run claude --help to get started
+
+⚠ Setup notes:
+  ● Native installation exists but ~/.local/bin is not in your PATH. Run:
+
+    echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+
+
+✅ Installation complete!
+
+ELAPSED_SEC=12
+VERSION=2.1.266 (Claude Code)
+BINARY=/home/azureuser/.local/share/claude/versions/2.1.266
+SIZE=206M

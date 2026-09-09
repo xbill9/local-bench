@@ -1,0 +1,112 @@
+##### BASELINE SCAN 2026-09-09T14:03:22-04:00 #####
+
+### PLATFORM ###
+  hostname                       debian
+  os                             Debian GNU/Linux 13 (trixie)
+  kernel                         7.1.8+deb13-amd64
+  dmi.sys_vendor                 LENOVO
+  dmi.product_name               83B1
+  dmi.bios_version               L4CN31WW
+  dmi.bios_date                  06/10/2026
+  dmi.chassis_asset_tag          NO Asset Tag
+  virt                           none
+unknown
+
+### HARDWARE PRESENT ###
+  cpu_model                      13th Gen Intel(R) Core(TM) i7-1360P
+  cpu_threads                    16
+  cpu_microcode                  0x6134
+  mem_total_kb                   16108896
+  swap_total_kb                  16509948
+  cpu_isa_notable                avx2 sha_ni vaes aes rdrand
+  pci_device_count               24
+  usb_device_count               30
+  block_devices                  nvme0n1 476.9G;
+  nvme_present                   1
+  net_ifaces                     docker0 enx00e04c69d95d veth71afd6f wlp0s20f3 
+  thermal_zones                  10
+  cpufreq_present                yes
+  rapl_present                   yes
+  throttle_counters              yes
+  tpm_present                    2
+  gpu_drm_nodes                  3
+
+### DEFAULT PACKAGE SET ###
+  dpkg_installed_count           1923
+  apt_sources                    13 entries
+  -- diagnostic/firmware packages present in the base image --
+    PRESENT  pciutils
+    PRESENT  usbutils
+    PRESENT  dmidecode
+    PRESENT  lshw
+    absent   hwinfo
+    PRESENT  nvme-cli
+    PRESENT  smartmontools
+    PRESENT  hdparm
+    PRESENT  lm-sensors
+    PRESENT  ethtool
+    PRESENT  sysstat
+    PRESENT  linux-cpupower
+    PRESENT  powertop
+    absent   numactl
+    absent   hwloc
+    PRESENT  intel-microcode
+    absent   amd64-microcode
+    absent   firmware-linux-free
+    PRESENT  fwupd
+    PRESENT  build-essential
+    PRESENT  gcc
+    PRESENT  make
+    PRESENT  git
+    PRESENT  curl
+    PRESENT  wget
+    PRESENT  ca-certificates
+    absent   gawk
+    PRESENT  mawk
+    PRESENT  jq
+    PRESENT  python3
+    PRESENT  unzip
+    absent   ripgrep
+
+### OBSERVABILITY TOOL AVAILABILITY ###
+    OK       lspci        /usr/bin/lspci
+    OK       lsusb        /usr/bin/lsusb
+    OK       dmidecode    /usr/sbin/dmidecode
+    OK       lshw         /usr/bin/lshw
+    OK       nvme         /usr/sbin/nvme
+    OK       smartctl     /usr/sbin/smartctl
+    OK       hdparm       /usr/sbin/hdparm
+    OK       sensors      /usr/bin/sensors
+    OK       ethtool      /usr/sbin/ethtool
+    OK       turbostat    /usr/sbin/turbostat
+    OK       powertop     /usr/sbin/powertop
+    OK       cpupower     /usr/bin/cpupower
+    MISSING  perf        
+    MISSING  numactl     
+    MISSING  lstopo      
+    OK       iostat       /usr/bin/iostat
+    OK       gcc          /usr/bin/gcc
+    OK       make         /usr/bin/make
+    OK       git          /usr/bin/git
+    OK       curl         /usr/bin/curl
+    OK       wget         /usr/bin/wget
+    OK       unzip        /usr/bin/unzip
+    OK       python3      /usr/bin/python3
+    OK       jq           /usr/bin/jq
+    OK       awk          /usr/bin/awk
+
+### GAP: HARDWARE PRESENT, NO TOOL TO OBSERVE IT ###
+    (end of gaps)
+
+### CLAUDE CODE PREREQUISITES ###
+  arch                           x86_64
+  glibc                          ldd (Debian GLIBC 2.41-12+deb13u3) 2.41
+  curl                           /usr/bin/curl
+  node                           MISSING
+  npm                            MISSING
+  unzip                          /usr/bin/unzip
+  claude_installed               /home/xbill/.local/bin/claude
+  home_writable                  yes
+  outbound_https                 302
+
+##### END BASELINE SCAN #####

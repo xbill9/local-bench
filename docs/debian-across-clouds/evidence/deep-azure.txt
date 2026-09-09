@@ -1,0 +1,98 @@
+# 1. IDENTITY
+
+- **Platform**: Microsoft Azure. Confirmed via IMDS (`http://169.254.169.254/metadata/instance`) and `systemd-detect-virt` → `microsoft`.
+- **Instance**: `Standard_D2s_v7`, resource group `local-bench-rg`, region `eastus`, VM name `baseline-pristine-azure`.
+- **Image**: Debian offer `debian-13`, SKU `13-gen2`, version `0.20260831.2587` (publisher Debian).
+- **Kernel**: `6.12.107+deb13-cloud-amd64` (Debian 13 "trixie", cloud kernel flavor).
+- **DMI** (`/sys/class/dmi/id/*`): `sys_vendor=Microsoft Corporation`, `product_name=Virtual Machine`, `bios_vendor=Microsoft Corporation`, `bios_version=Hyper-V UEFI Release v4.1` — this is Hyper-V/Azure Gen2 UEFI firmware, consistent with IMDS.
+- **CPU**: `Intel(R) Xeon(R) 6973P-C` (family 6, model 173, stepping 1). Topology: 1 socket, 1 core, 2 threads/core → 2 logical CPUs (matches the D2s_v7 2-vCPU size). `lscpu` reports L3 480 MiB, which is the *host's* shared cache surfaced through CPUID, not a per-VM allocation — normal for cloud VMs.
+- **RAM**: 7.8 GiB total (matches D2s_v7's 8 GiB spec), no swap configured.
+- **Virtualization**: `VT-x`, hypervisor vendor `Microsoft`, type `full`. `virtualTpmEnabled=false`, `secureBootEnabled=false` per IMDS; confirmed locally — no `/dev/tpm*`, `mokutil --sb-state` → "SecureBoot disabled".
+
+# 2. DRIVERS
+
+Full PCI device list (`lspci -vv`), 3 devices total, **all with drivers bound**:
+
+| BDF | Device | Driver |
+|---|---|---|
+| 757d:00:00.0 | NVMe controller (Microsoft 1414:00a9) | `nvme` |
+| 7870:00:00.0 | Ethernet controller (Microsoft 1414:00ba) | `mana` |
+| c05b:00:00.0 | NVMe controller (Microsoft 1414:00a9) | `nvme` |
+
+**No unbound PCI devices exist on this machine.** This is expected: Hyper-V/Azure Gen2 VMs expose almost nothing on the emulated PCI bus (no legacy PS/2, VGA, or ISA-bridge chips like on QEMU/KVM); the two NVMe controllers are the para-virtualized disk accelerator path, and `mana` is the Azure Accelerated Networking NIC.
+
+VMBus (`/sys/bus/vmbus/devices/`, 13 devices) — **all bound**, covering the synthetic devices PCI doesn't show: `hv_pci` (x3, PCI pass-through channels for the NVMe/NIC above), `hv_storvsc` (synthetic SCSI, backs `sr0`/root disk path), `hv_netvsc` (synthetic NIC, teamed with `mana` for accelerated networking), `hv_balloon`, `hv_utils` (x4, host integration services), `hyperv_fb` (framebuffer), `hyperv_keyboard`, `hid_hyperv`. No gaps here either.
+
+- **Storage**: `nvme0n1` (30 GB, model "MSFT NVMe Accelerator v1.0") is the OS disk, mounted via `nvme` driver; `sr0` (628K virtual DVD-ROM) is present via the storvsc synthetic path.
+- **Network**: `eth0`/`enP30832s1` pair — `hv_netvsc` synthetic NIC with the `mana` PCI VF bonded underneath for Accelerated Networking (standard Azure NIC-bonding model).
+
+# 3. FIRMWARE
+
+- `dmesg | grep -i firmware` → **no output at all**: no firmware load attempts, successes, or failures logged. There is nothing here needing a blob (no GPU, no Wi-Fi, no discrete NIC firmware needed by `mana`/`hv_netvsc`/`nvme`, which are all para-virtual and load no external firmware files).
+- `dpkg -l | grep -iE "firmware|microcode"` → **empty**. No firmware package (`firmware-linux`, `intel-microcode`, etc.) is installed. This is not a gap for a synthetic Hyper-V VM — none of the bound drivers request firmware blobs — but it does mean no microcode update path exists locally.
+- **Microcode**: `/proc/cpuinfo` reports `microcode: 0xffffffff` and `dmesg | grep -i microcode` returns nothing. `0xffffffff` is Hyper-V's standard masking value — the hypervisor hides the real host microcode revision from the guest and blocks in-guest microcode loading. This is expected/by-design on Azure, not a fault.
+
+# 4. KERNEL ERRORS
+
+- **Taint**: `/proc/sys/kernel/tainted` = `0` — kernel is untainted.
+- `dmesg --level=err,warn` (full boot log, deduped): 8 distinct messages/counts:
+
+| Count | Message | Benign? |
+|---|---|---|
+| 4 | `eth0 speed is unknown, defaulting to 1000` | Yes — synthetic `hv_netvsc` link has no physical speed to report; harmless default. |
+| 3 | `systemd-ssh-generator[…]: Failed to query local AF_VSOCK CID: Cannot assign requested address` (+ matching generator exit-status-1 lines) | Yes — Hyper-V doesn't expose AF_VSOCK; the generator (used for `ssh vsock/…` targets) fails its probe and simply skips vsock support. No functional impact — regular SSH still works. |
+| 1 | `nvme nvme1: Identify NS List failed (status=0xb)` | Yes — `nvme1` (757d controller) is the accelerator controller for the Azure *resource disk*, which IMDS reports as `size: 0` (not provisioned) on this SKU. No namespace to identify is expected, not a real disk fault. |
+| 1 | `nvme nvme0: using unchecked data buffer` | Benign informational note, common on this driver/kernel combo, not an error condition. |
+| 4 | `hv_storvsc …: tag#… cmd 0x85 status: scsi 0x2 srb 0x6 hv 0xc0000001` | Benign — cmd 0x85 is ATA PASS-THROUGH (smartctl/hdparm-style probes issued by udev at boot against a disk that doesn't support ATA passthrough over storvsc); consistently rejected the same way, no I/O failure. |
+| 1 | `cpu_based_exec_ctrl unsupported with eVMCS: 0x20000` | Benign — informational note from KVM/nested-virt code path enumerating enlightened VMCS capabilities; not applicable/used here since this is a first-level Hyper-V guest. |
+| 1 | `RETBleed: WARNING: Spectre v2 mitigation leaves CPU vulnerable to RETBleed attacks, data leaks possible!` | **Real, but expected on this CPU/microcode combo** — `lscpu` confirms `Vulnerability Retbleed: Vulnerable`. This reflects the masked/older microcode exposed by the hypervisor (see §3) lacking full RETBleed mitigation hardware support; it's a genuine security-relevant warning, not a driver bug, and outside this guest's control. |
+| 1 | `PCI: System does not support PCI` | Benign — early boot probe before ACPI/MMCONFIG for PCI is set up by the Hyper-V PCI passthrough bus; superseded moments later when `hv_pci` brings the 3 devices online (§2). |
+| 1 | `Hyper-V: Disabling IBT because of Hyper-V bug` | Known/expected — Hyper-V's IBT (Indirect Branch Tracking / CET) support has a documented kernel workaround disabling it; not a host misconfiguration on your part. |
+
+- **ACPI**: 48 total ACPI-related lines in dmesg, **zero** contain error/fail/warn. No ACPI problems.
+
+# 5. FAILED UNITS
+
+- `systemctl --failed` → **0 failed units**.
+- `systemctl is-system-running` → `running` (not degraded).
+- Checked `NRestarts` across all loaded service units → **none** have restarted (all `NRestarts=0`). No boot-time restart loops.
+
+# 6. SYSTEM TOOLS
+
+Checked with `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`, cross-checked against `dpkg -l`:
+
+**Present**: `lspci`, `lsblk`, `lscpu` (from `pciutils`/`util-linux`), `ethtool` at `/usr/sbin/ethtool` (from `ethtool` 6.14.2 — this is the tool a bare login-PATH `command -v ethtool` missed earlier in this project; it is genuinely installed, just in sbin).
+
+**Absent** (checked, and confirmed absent from `dpkg -l` too — not merely a PATH issue): `lsusb`, `dmidecode`, `smartctl`, `nvme-cli`, `lm-sensors` (`sensors`), `ipmitool`, `turbostat`, `powertop`, `hwloc` (`lstopo`), `hwinfo`, `lshw`, `edac-utils`, `rasdaemon`, `mcelog`, `stress-ng`, `fio`, `numactl`, `linux-perf` (`perf`), `acpid`/`acpi`, `tlp`, `cpupower` (`linux-cpupower`).
+
+This is a minimal/baseline image — only the bare disk-and-network inspection tools (`pciutils`, `ethtool`, `util-linux`) are installed; nothing for SMART, sensors, power, NUMA, or performance profiling.
+
+# 7. GAPS
+
+**Present hardware/kernel facilities the current toolset can't observe:**
+
+| Facility present | Evidence | What's missing to use it | Package |
+|---|---|---|---|
+| NVMe controllers/namespaces, SMART/health log pages | `/sys/class/nvme/nvme{0,1}` exist, `nvme` driver bound | No CLI to query SMART/health/namespace state | `nvme-cli` |
+| PCI/VMBus device tree | `lspci`, `/sys/bus/vmbus/devices` walkable manually | No structured/tree view (`lshw`, `hwinfo`) | `lshw` or `hwinfo` |
+| NIC link/ring/offload stats beyond driver name | `ethtool -i` works | Full `ethtool -S`/`-g`/`-k` stats accessible but no `lsusb`-style broader USB/HW inventory tool exists at all | (n/a — ethtool already covers NIC; `lsusb` gap is moot, no USB controller exists on this VM) |
+| `msr`/`cpuid` kernel modules | `modinfo msr`/`modinfo cpuid` show both **built and available** on disk (`/lib/modules/.../msr.ko.xz`), but **not loaded** (`ls /dev/cpu/0/` → no such directory) | `modprobe msr` (and cpuid) to expose `/dev/cpu/*/msr`, then a consumer like `turbostat`/`rdmsr` | `msr-tools`, plus `linux-cpupower`/`turbostat` (ships in `linux-cpupower`/kernel-tools package) |
+| System DMI/BIOS table beyond the raw sysfs strings already read | `/sys/class/dmi/id/*` readable directly | No `dmidecode` to decode the full SMBIOS table (memory slots, etc. — though Hyper-V synthesizes minimal SMBIOS anyway) | `dmidecode` |
+
+**Instrumentation genuinely ABSENT from this VM (not a missing tool — nothing to observe):**
+
+- **`/sys/class/hwmon`**: does not exist. No hwmon device is registered at all — confirmed by directory absence, not a permissions error. Hyper-V doesn't synthesize a hwmon/sensor device for guests; a bare-metal Xeon host would have one via `coretemp`/platform drivers. This is the **hypervisor not exposing** sensor hardware to the guest, not `lm-sensors` being uninstalled — installing `sensors` here would find nothing to probe.
+- **`/sys/class/powercap`** (RAPL): does not exist. RAPL MSRs are a physical-CPU energy-accounting facility that Hyper-V does not virtualize/pass through to guests. Genuine hypervisor restriction — no amount of tooling would recover this without host-level access.
+- **`/sys/class/thermal`**: contains only `cooling_device0/1` (Hyper-V's synthetic throttling notification path), **no `thermal_zone*`**. No temperature sensor is exposed to the guest — again the hypervisor hiding physical thermal data, distinguishable from "just not instrumented" because the cooling-device stubs exist but carry no temperature source.
+- **`/sys/devices/system/edac`**: does not exist. No ECC/memory-error reporting surfaced to the guest — expected, since DRAM ECC handling is a host/hypervisor responsibility, not delegated to VMs.
+- **`/dev/tpm*`**: absent, and IMDS confirms `virtualTpmEnabled: false` for this VM — a real, deliberate configuration choice (vTPM is available on Azure but was not enabled for this instance), not a hidden capability.
+- **Real CPU microcode revision**: masked to `0xffffffff` (§3) — Hyper-V intentionally hides the true value; distinguishable from "not supported" because the field exists and is populated, just with the sentinel mask value rather than a real revision or an absent field.
+
+# VERDICT
+
+- Nothing is broken: 0 failed/degraded systemd units, 0 kernel taint, all PCI/VMBus devices have drivers bound, no ACPI errors.
+- `Vulnerability Retbleed: Vulnerable` — real, kernel-flagged Spectre-class exposure tied to the microcode Hyper-V exposes to this VM; track host-side microcode/mitigation updates from Azure, nothing actionable in-guest.
+- If disk health monitoring is wanted, install `nvme-cli` (no SMART/health visibility for the NVMe-backed OS disk today).
+- If host power/thermal/ECC visibility is expected, stop looking for it here — RAPL, hwmon, thermal zones, and EDAC are all hidden by Hyper-V, not just uninstalled; nothing to fix in-guest.
+- Optional: `modprobe msr` + install `msr-tools`/`linux-cpupower` if CPU frequency/MSR-level diagnostics become necessary.
+- The `systemd-ssh-generator` AF_VSOCK failures on every boot are cosmetic/expected (no vsock under Hyper-V) — safe to ignore, not worth suppressing.

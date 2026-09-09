@@ -1,0 +1,105 @@
+# 1. IDENTITY
+
+- **Cloud platform:** Google Compute Engine (confirmed via metadata server, `169.254.169.254`, and `systemd-detect-virt` → `google`).
+- **Instance:** `baseline-pristine-gce`, machine type `c4-standard-2`, zone `us-east1-b`, project `aisprint-491218`.
+- **Image:** `projects/debian-cloud/global/images/debian-13-trixie-v20260908`.
+- **Kernel:** `6.12.107+deb13-cloud-amd64` (Debian 13 "trixie" cloud kernel).
+- **CPU:** Intel Xeon Platinum 8581C @ 2.30GHz (metadata reports platform "Emerald Rapids"), 1 socket, 1 core, 2 threads (SMT) → 2 vCPUs, no NUMA split. AVX-512, AMX (bf16/tile/int8) present in flags — real Emerald Rapids ISA exposed through to the guest.
+- **RAM:** 7,102,784 kB (~6.8 GiB), consistent with c4-standard-2 (2 vCPU/8GB nominal, minus firmware/hypervisor reservation).
+- **Virtualization:** KVM full virtualization (`lscpu` "Hypervisor vendor: KVM"; `dmesg`: "Hypervisor detected: KVM", paravirtualized kvm-clock, PV spinlocks). DMI (`sys_vendor`/`bios_vendor`/`product_name`) all report "Google" / "Google Compute Engine" — Google's own thin QEMU/KVM wrapper, not raw stock QEMU.
+
+# 2. DRIVERS
+
+Full `lspci -nnk` output, 15 devices total:
+
+| Device | Driver bound | Assessment |
+|---|---|---|
+| 00:00.0 440FX Host bridge | none | Expected — legacy PCI host bridge stub, no driver needed |
+| 00:01.0 PIIX4 ISA bridge | none | Expected — emulated legacy chipset glue, not a real device |
+| 00:01.3 PIIX4 ACPI | none | Expected — same, ACPI logic is handled by the ACPI subsystem, not a PCI driver |
+| 00:03.0 Google gVNIC | `gve` | Real, in use |
+| 00:04.0 Virtio RNG | `virtio-pci` | Real, in use (entropy source) |
+| 00:05.0, 01:00.0, 02:00–07.0 (9x) Google PCI bridges | `pcieport` | Real, in use — PCIe switch fabric GCP exposes for hotplug/NVMe topology |
+| 03:00.0 Google NVMe controller | `nvme` | Real, in use — backs the Hyperdisk-Balanced persistent disk |
+
+No device is missing a driver it should have. The three driver-less entries are all classic PIIX4/440FX emulated-chipset artifacts that every QEMU/KVM guest carries for legacy compatibility — not a real gap.
+
+**Network driver:** `gve` (Google Virtual NIC), matches metadata's `nic-type: GVNIC`.
+**Storage driver:** `nvme` (kernel-native NVMe), matches metadata's `disks/0/interface: NVME`.
+
+# 3. FIRMWARE
+
+- `dmesg | grep -i firmware` returns only one hit, and it's unrelated: a systemd unit condition check referencing an EFI-firmware path (`efivars/HibernateLocation-...`), not an actual firmware load.
+- **No firmware-load attempts, successes, or failures appear at all** — gVNIC, virtio-pci, nvme, and pcieport are all firmware-less kernel-native drivers on this platform.
+- `dpkg -l | grep -i firmware` returns **nothing** — no `linux-firmware`/`firmware-*` package is installed at all.
+- This is not a gap: none of the bound drivers (`gve`, `virtio-pci`, `nvme`, `pcieport`) request firmware blobs on this hardware, so absence of both firmware-load messages and a firmware package is consistent, not a hidden failure.
+- **Microcode:** `/proc/cpuinfo` reports `microcode: 0xffffffff`. No microcode load messages in `dmesg`. This is GCP/KVM masking the true revision from the guest (standard behavior — the host manages microcode, guests aren't allowed to see or update it), not a failure to load microcode.
+
+# 4. KERNEL ERRORS
+
+- **Taint:** `/proc/sys/kernel/tainted` = `0` — kernel is untainted.
+- `dmesg` is short (690 lines total); grepping error/fail/warn and de-duplicating:
+
+| Count | Message | Benign? |
+|---|---|---|
+| 2 | `GPT: Use GNU Parted to correct GPT errors.` (+ header mismatch lines) | **Benign** — occurs at 1.95s and 2.23s during boot, before `gce-disk-expand` resizes the root partition/moves the GPT backup header to match the new (larger) disk size. Transient, self-corrected by the same boot's disk-expand step. |
+| 1 | `unchecked MSR access error: RDMSR from 0xe2` | **Benign** — MSR 0xe2 is `MSR_IA32_MISC_ENABLE` probing for turbo/EIST state; KVM doesn't emulate it and the kernel logs-and-ignores rather than crashing. Standard guest noise. |
+| 3 | `systemd-ssh-generator: Failed to query local AF_VSOCK CID` | **Benign** — this generator looks for a VSOCK device (used for host↔guest SSH proxy in some hypervisors, e.g. Firecracker/Cloud Hypervisor); GCP's KVM doesn't expose VSOCK, so the lookup correctly fails and the generator exits — no SSH-over-vsock is expected here. |
+| 1 | `i8042: Warning: Keylock active` | **Benign** — cosmetic quirk of QEMU's emulated i8042 PS/2 controller reporting the keyboard-lock line as asserted; irrelevant on a keyboard-less VM. |
+| 1 | `RAS: Correctable Errors collector initialized.` | Informational, not an error. |
+
+No ACPI errors/warnings/failures at all (`dmesg | grep -i acpi` combined with err/fail/warn returned nothing). No `dmesg --level=err,crit,alert,emerg` entries beyond the ssh-generator vsock messages already covered.
+
+`journalctl -b -p err` additionally shows:
+- `google_guest_agent: Failed to run clock skew setup: failed to run hwclock: fork/exec /sbin/hwclock: no such file or directory` — real but low-impact: the `util-linux` `hwclock` binary isn't installed in this minimal image, so the guest agent's clock-skew-correction helper no-ops. Not consequential since `kvm-clock` (not the RTC) is the active clocksource.
+- One `sshd-session: kex_exchange_identification: read: Connection reset by peer` — a single external client (likely an internet scanner hitting the public IP) that reset the TCP connection before completing SSH key exchange. Not a host defect.
+
+# 5. FAILED UNITS
+
+- `systemctl --failed` → **empty**, no failed units.
+- `systemctl is-system-running` → `running` (not degraded).
+- Checked `NRestarts` across every loaded service unit → **none had restarted** during this boot.
+
+# 6. SYSTEM TOOLS
+
+Checked with `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` and cross-verified against `dpkg -l`:
+
+**Present:**
+| Tool | Path | Package |
+|---|---|---|
+| `lspci` | `/usr/bin/lspci` | pciutils |
+| `dmidecode` | `/usr/sbin/dmidecode` | dmidecode |
+| `nvme` (nvme-cli) | `/usr/sbin/nvme` | nvme-cli |
+| `ethtool` | `/usr/sbin/ethtool` | ethtool |
+
+**Absent (verified via both `command -v` on the full sbin-inclusive PATH and confirmed no matching package in `dpkg -l`):** `lsusb`, `lsscsi`, `lshw`, `smartctl` (smartmontools), `sensors`/`lm-sensors`, `ipmitool`, `turbostat`/`powertop` (linux-cpupower package), `mstflint`, `fwupdmgr` (fwupd), `stress-ng`, `edac-utils`, `rasdaemon`, `acpi`, `tpm2_getcap` (tpm2-tools), and plain `hwclock` (util-linux's hwclock component).
+
+This is a genuinely minimal image — only the four PCI/DMI/NVMe/Ethernet basics ship by default; every deeper hardware-observability layer (SMART, sensors, IPMI, TPM tooling, power/thermal, RAS/EDAC) is missing as a package, not merely hidden from PATH.
+
+# 7. GAPS
+
+Hardware/kernel facilities present but unobservable with the current toolset:
+
+| Present facility | Evidence | Missing tool | Package to install |
+|---|---|---|---|
+| TPM 2.0 device | `/dev/tpm0`, `/dev/tpmrm0` exist; `tpm_tis MSFT0101:00: 2.0 TPM` in dmesg (Microsoft virtual TPM, i.e. GCP Shielded VM vTPM) | no way to query/attest it | `tpm2-tools` |
+| NVMe SMART/health log | `nvme0n1` bound to `nvme` driver, `nvme list` works | `nvme smart-log` works today (nvme-cli present) but generic `smartctl` cross-checking is absent | `smartmontools` (optional, redundant with nvme-cli here) |
+| Correctable/uncorrectable memory errors (RAS) | kernel prints `RAS: Correctable Errors collector initialized.` at boot — the collector is active | no consumer of the events (`/sys/devices/system/edac` doesn't even exist — see below) | `rasdaemon` (userspace consumer; won't create the sysfs tree itself — see next point) |
+| PCIe hotplug fabric (10 `pcieport` bridges) | `lspci` shows the full switch topology | no `lshw`/`lsusb`-style consolidated hardware summary | `lshw`, `pciutils` extras |
+| Network link/driver stats beyond basics | `gve` driver bound | `ethtool` present covers this adequately — not a gap |
+
+Instrumentation absent because the **virtual hardware genuinely doesn't expose it** (not the hypervisor hiding a real capability):
+- **`/sys/class/hwmon`** — does not exist. No hardware monitoring chip is emulated by KVM/GCP; a bare-metal box would have this from real voltage/fan/temp sensors. Confirmed absence, not a driver gap — there's no PCI/platform device in `lspci`/`dmesg` that a hwmon driver could bind to.
+- **`/sys/class/powercap`** — does not exist, i.e. no RAPL. Emerald Rapids silicon has real RAPL, but KVM does not virtualize the RAPL MSRs/PCI power-management registers to guests, so this is the **hypervisor withholding a real hardware feature**, not the CPU lacking it. (Distinguishable because the CPU flags/model are the genuine Emerald Rapids part, and GCP publicly does not pass through RAPL to standard guest VMs.)
+- **`/sys/class/thermal`** — only `cooling_device0/1` exist, no `thermal_zone*`. No temperature sensor is emulated; consistent with there being no `hwmon` either. This is the hypervisor design (VMs have no physical temperature to report), not a masked capability.
+- **`/sys/devices/system/edac`** — does not exist. EDAC requires a memory-controller driver bound to real DIMM hardware, which KVM doesn't expose to guests (RAM is just guest-physical pages backed by host memory). Confirmed absent at the sysfs level, so `rasdaemon` would have nothing to read even if installed — the boot-time "RAS: Correctable Errors collector" message refers to the generic MCE-bus collector, not an EDAC driver.
+- **Microcode revision** — real value exists on the host but is masked to `0xffffffff` in the guest, per GCP standard practice, confirmed by the metadata's `cpu-platform: Intel Emerald Rapids` string proving the real SKU is known while `/proc/cpuinfo` deliberately obscures the exact revision.
+
+# VERDICT
+
+1. No action required for stability: 0 failed units, untainted kernel, `is-system-running: running`, no service restarts.
+2. Everything flagged in `dmesg`/`journalctl` (GPT/disk-expand transient, MSR 0xe2 probe, AF_VSOCK generator, i8042 keylock, one reset SSH handshake) is expected KVM/GCP guest noise — nothing to fix.
+3. `hwclock` binary is missing (`util-linux`'s hwclock component), causing `google_guest_agent`'s clock-skew-setup step to fail every boot; install `util-linux`'s hwclock or accept it (kvm-clock is authoritative anyway, so low priority).
+4. If SMART/RAS/thermal visibility is wanted for fleet monitoring, install `smartmontools`, `rasdaemon`, `tpm2-tools` — but note RAPL, EDAC, and hwmon/thermal sysfs simply don't exist on this VM class, so no tool will surface them; don't spend effort chasing those.
+5. TPM 2.0 (vTPM) is present and completely unmanaged — worth adding `tpm2-tools` if attestation/measured-boot is part of the security posture here.
+6. No real driver or firmware gaps exist: every PCI device with a real function has its driver bound, and no firmware load ever fails.

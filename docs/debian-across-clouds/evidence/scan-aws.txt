@@ -1,0 +1,114 @@
+##### BASELINE SCAN 2026-09-09T18:11:17+00:00 #####
+
+### PLATFORM ###
+  hostname                       ip-172-31-6-191
+  os                             Debian GNU/Linux 13 (trixie)
+  kernel                         6.12.107+deb13-cloud-amd64
+  dmi.sys_vendor                 Amazon EC2
+  dmi.product_name               c7i.large
+  dmi.bios_version               1.0
+  dmi.bios_date                  10/16/2017
+  dmi.chassis_asset_tag          Amazon EC2
+  virt                           amazon
+
+### HARDWARE PRESENT ###
+  cpu_model                      Intel(R) Xeon(R) Platinum 8488C
+  cpu_threads                    2
+  cpu_microcode                  0x2b000661
+  mem_total_kb                   3918296
+  swap_total_kb                  0
+  cpu_isa_notable                avx2 avx512f avx512_bf16 avx512_fp16 amx_tile amx_bf16 amx_int8 sha_ni vaes aes rdrand
+  pci_device_count               46
+  usb_device_count               0
+  block_devices                  nvme0n1   20G;
+  nvme_present                   1
+  net_ifaces                     enp39s0 
+  thermal_zones                  0
+  cpufreq_present                no
+  rapl_present                   no
+  throttle_counters              no
+  tpm_present                    0
+  gpu_drm_nodes                  0
+
+### DEFAULT PACKAGE SET ###
+  dpkg_installed_count           337
+  apt_sources                    2 entries
+  -- diagnostic/firmware packages present in the base image --
+    PRESENT  pciutils
+    absent   usbutils
+    absent   dmidecode
+    absent   lshw
+    absent   hwinfo
+    absent   nvme-cli
+    absent   smartmontools
+    absent   hdparm
+    absent   lm-sensors
+    PRESENT  ethtool
+    absent   sysstat
+    absent   linux-cpupower
+    absent   powertop
+    absent   numactl
+    absent   hwloc
+    absent   intel-microcode
+    absent   amd64-microcode
+    absent   firmware-linux-free
+    absent   fwupd
+    absent   build-essential
+    absent   gcc
+    absent   make
+    absent   git
+    PRESENT  curl
+    PRESENT  wget
+    PRESENT  ca-certificates
+    absent   gawk
+    PRESENT  mawk
+    absent   jq
+    PRESENT  python3
+    absent   unzip
+    absent   ripgrep
+
+### OBSERVABILITY TOOL AVAILABILITY ###
+    OK       lspci        /usr/bin/lspci
+    MISSING  lsusb       
+    MISSING  dmidecode   
+    MISSING  lshw        
+    MISSING  nvme        
+    MISSING  smartctl    
+    MISSING  hdparm      
+    MISSING  sensors     
+    OK       ethtool      /usr/sbin/ethtool
+    MISSING  turbostat   
+    MISSING  powertop    
+    MISSING  cpupower    
+    MISSING  perf        
+    MISSING  numactl     
+    MISSING  lstopo      
+    MISSING  iostat      
+    MISSING  gcc         
+    MISSING  make        
+    MISSING  git         
+    OK       curl         /usr/bin/curl
+    OK       wget         /usr/bin/wget
+    MISSING  unzip       
+    OK       python3      /usr/bin/python3
+    MISSING  jq          
+    OK       awk          /usr/bin/awk
+
+### GAP: HARDWARE PRESENT, NO TOOL TO OBSERVE IT ###
+    GAP  NVMe storage           present, no nvme-cli
+    GAP  Disk health            NVMe present, no smartmontools
+    GAP  DMI/SMBIOS             readable via sysfs, no dmidecode for full tables
+    (end of gaps)
+
+### CLAUDE CODE PREREQUISITES ###
+  arch                           x86_64
+  glibc                          ldd (Debian GLIBC 2.41-12+deb13u3) 2.41
+  curl                           /usr/bin/curl
+  node                           MISSING
+  npm                            MISSING
+  unzip                          MISSING
+  claude_installed               no
+  home_writable                  yes
+  outbound_https                 302
+
+##### END BASELINE SCAN #####

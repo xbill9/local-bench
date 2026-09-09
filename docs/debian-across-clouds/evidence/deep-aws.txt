@@ -1,0 +1,82 @@
+# 1. IDENTITY
+
+- **Platform:** AWS EC2 (confirmed via IMDSv2, not guessed from DMI alone). `curl -H "X-aws-ec2-metadata-token: ..." http://169.254.169.254/latest/meta-data/...` returned: region `us-east-1`, AZ `us-east-1a`, instance-id `i-07a6b25fe56ccca05`, instance-type `c7i.large`, ami `ami-0871da4641e8b4413`. IMDS `hypervisor` endpoint returned 404 (normal on Nitro — that endpoint is a Xen-era leftover).
+- **DMI** (`/sys/class/dmi/id/*`): sys_vendor/bios_vendor `Amazon EC2`, product_name `c7i.large`, bios_version `1.0`, bios_date `10/16/2017` (a fixed Nitro/QEMU BIOS stamp, not a real hardware date).
+- **Kernel:** `6.12.107+deb13-cloud-amd64` (Debian 13 "trixie" cloud kernel, built 2026-08-29). `uname -a` confirms x86_64.
+- **CPU:** Intel Xeon Platinum 8488C (family 6, model 143, stepping 8) — Sapphire Rapids-class, AVX-512/AMX-capable. Topology: 1 socket, 1 core, 2 threads (SMT) = 2 vCPUs, 1 NUMA node. TSC 2400 MHz.
+- **RAM:** 3.7 GiB total, 0 swap (`free -h`).
+- **Virtualization:** `lscpu` reports Hypervisor vendor **KVM**, full virtualization; dmesg confirms `Hypervisor detected: KVM`. This is AWS's KVM-based Nitro platform.
+- **Boot mode:** legacy BIOS, not UEFI — `/sys/firmware/efi` does not exist, and dmesg shows `legacy bootconsole [earlyser0]`, despite an unused EFI System Partition (`nvme0n1p15`) being mounted at `/boot/efi`.
+
+# 2. DRIVERS
+
+`sudo lspci -k` enumerated ~45 devices. Storage and network are correctly bound:
+- **Storage:** `00:04.0 NVMe EBS Controller` → driver `nvme`.
+- **Network:** `27:00.0 Elastic Network Adapter (ENA)` → driver `ena` (confirmed active in `/proc/interrupts`: `ena-mgmnt@pci:0000:27:00.0`).
+- ~35 `Amazon.com Device 0200` PCI bridges (the Nitro PCIe fabric) → driver `pcieport` on all of them.
+
+**Devices with NO driver bound**, all expected emulated-legacy-chipset artifacts, none are real gaps:
+- `00:00.0` Intel 440FX host bridge — host bridges never take a driver.
+- `00:01.0` Intel PIIX3 ISA bridge — legacy stub, no driver needed.
+- `00:01.3` Intel PIIX4 ACPI device — handled by the kernel's ACPI core/quirk code directly (`quirk_piix4_acpi`), not a loadable driver.
+- `00:03.0` "Amazon.com Device 1111" VGA controller — Nitro's emulated legacy VGA console stub; headless server, no framebuffer driver installed or needed.
+
+# 3. FIRMWARE
+
+- `dpkg -l | grep -i firmware` returned **nothing** — no firmware package (e.g. `linux-firmware`) is installed at all.
+- `dmesg | grep -i firmware` returned only one unrelated line (a systemd unit checking an EFI variable path for hibernate info) — **zero** `request_firmware()` load attempts, successes, or failures logged.
+- This is benign: `ena`, `nvme`, and the PCI bridges are Nitro-virtualized devices that don't request runtime firmware blobs from the guest kernel — firmware (if any) lives host-side. There is no missing-firmware failure to distinguish from debug-only noise because no firmware load was ever attempted.
+- **Microcode:** `/proc/cpuinfo` reports `microcode: 0x2b000661`. This is whatever value the host CPU/KVM presents via CPUID; the guest has no visibility into whether AWS masks or elides the true host revision, and no microcode update mechanism runs in-guest (expected — cloud vCPU microcode is host-managed).
+
+# 4. KERNEL ERRORS
+
+- **Taint:** `/proc/sys/kernel/tainted` = `0` (clean).
+- `sudo dmesg --level=err,warn` → 12 lines total. Grouped by distinct cause:
+
+| Count | Message | Verdict |
+|---|---|---|
+| 4 | `GPT:16777215 != 41943039` / "Alt. header is not at the end of the disk" / "Use GNU Parted to correct GPT errors" | **Real, actionable.** 16,777,215 sectors ≈ 8 GiB; the disk is now 41,943,040 sectors (20 GiB). The EBS volume was grown from 8→20 GiB but the backup GPT header/table was never relocated. Kernel falls back to the primary header so it still boots, but should be fixed. |
+| 4 | `systemd-ssh-generator[...]: Failed to query local AF_VSOCK CID: Cannot assign requested address` (+2 matching generator-exit-status lines) | Benign. Recent systemd's ssh-generator probes AF_VSOCK for host-initiated SSH; this Nitro guest exposes the vsock kernel modules (`vsock`, `vmw_vsock_*`) but no working host CID, so the probe fails harmlessly. Does not affect actual sshd. |
+| 1 | `nvme nvme0: using unchecked data buffer` | Benign, cosmetic NVMe driver diagnostic. |
+| 1 | `acpi PNPNA...: fail to add MMCONFIG information, can't access extended configuration space under this bridge` | Benign — the emulated Nitro PCIe bridge topology doesn't expose MCFG for that bridge; PCI still enumerates fully via legacy config space (confirmed — all devices visible in lspci). |
+| 1 | `i8042: Warning: Keylock active` | Benign standard QEMU/KVM emulated-PS/2-controller boot chatter; no physical keylock exists. |
+
+- **ACPI:** no errors beyond the MMCONFIG note above. The rest of the ACPI log is routine: PnP ACPI init, ~90 `acpiphp: Slot [n] registered` lines (PCI hotplug slot capacity registration), `clocksource: acpi_pm` — all normal.
+
+# 5. FAILED UNITS
+
+- `systemctl --failed` → **0 units**.
+- `systemctl is-system-running` → `running` (not degraded).
+- No services show start-limit-hit or crash-restart loops in the boot journal. The one `apparmor.systemd[562]: Restarting AppArmor` line is normal profile-reload wording within a single successful `apparmor.service` start, not a crash/restart.
+
+# 6. SYSTEM TOOLS
+
+Checked with `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` via `command -v`, cross-checked against `dpkg -l` — both methods agree in every case (no PATH-visibility discrepancies found).
+
+**Present:** `lspci`/`pciutils`, `ethtool`, `aws` CLI, `ec2-metadata` and `ebsnvme-id` (`amazon-ec2-utils`), `cloud-init`.
+
+**Absent** (confirmed genuinely not installed via `dpkg -l`, not merely hidden from PATH): `lshw`, `dmidecode`, `lsusb`/usbutils, `lsscsi`, `sensors`/lm-sensors, `smartctl`/smartmontools, `nvme`-cli, `turbostat`/`powertop`/cpupower, `mcelog`, `rasdaemon`, `ipmitool`, `acpid`, `iostat`/`mpstat`/sysstat, `perf`, `numactl`, `edac-utils`, `lstopo`/hwloc, `stress-ng`, msr-tools.
+
+# 7. GAPS
+
+**Hardware/kernel facilities present but unobservable with current tooling:**
+- **NVMe health/SMART:** `nvme0` is live and bound, but no `nvme-cli` → no way to query SMART log, namespace/health info. *Closes with:* `nvme-cli`.
+- **RAPL/energy:** `intel_rapl_msr`, `intel_rapl_common`, and `rapl` kernel modules **are loaded**, and dmesg shows the RAPL perf PMU registered a `psys` domain — KVM is exposing RAPL MSRs. But `/sys/class/powercap/` is empty (no `intel-rapl` zone directories got created) and `/dev/cpu/*/msr` doesn't exist (the `msr` module isn't loaded) and no `turbostat`/`powercap` reader is installed — so despite kernel-level RAPL support existing, there is currently no userspace path to read power/energy. *Closes with:* `linux-cpupower` (turbostat) + `modprobe msr` (`msr-tools`).
+- **DMI/SMBIOS detail:** raw DMI strings are readable directly under `/sys/class/dmi/id/*`, but structured/decoded SMBIOS tables (e.g. memory slot population, which dmesg shows as "Memory slots populated: 1/1" but nothing decodes further) aren't inspectable. *Closes with:* `dmidecode` (and `lshw` for a consolidated view).
+- **perf counters:** CPU reports `arch_perfmon` in its flag set, but no `perf` binary is installed to actually use it. *Closes with:* `linux-perf-6.12` (or the generic `linux-perf` meta-package matching this kernel).
+
+**Instrumentation genuinely ABSENT from this VM (hypervisor hiding it, not a missing package)** — verified by checking that the kernel found *zero* underlying devices/controllers to bind to, which a tool install cannot fix:
+- No `/sys/class/hwmon` directory at all → no sensor chips exposed by KVM; `lm-sensors` would find nothing.
+- No `/sys/devices/system/edac` → no virtual memory-controller EDAC device; Nitro doesn't pass through real DIMM error reporting to the guest.
+- `thermal_zone*` entries: none exist, only two stub `cooling_device{0,1}` ACPI processor-cooling objects with no backing temperature sensor — no real thermal zone was ever registered.
+- No `/sys/firmware/efi` → this instance boots BIOS/legacy mode, so no EFI variable/runtime-services introspection is possible (not hidden, genuinely not in use for this boot).
+
+# VERDICT
+
+1. **Fix the GPT backup header now** — the 8 GiB→20 GiB volume resize never relocated it (`GPT:16777215 != 41943039`); run `sudo sgdisk -e /dev/nvme0n1` (or `parted` "Fix") before any partition-table-editing tool refuses to work.
+2. **Install `nvme-cli`** — the only EBS volume on this box has zero SMART/health visibility today.
+3. **Install `dmidecode`/`lshw`** — no hardware-inventory tool exists at all, not merely off PATH.
+4. If power/energy metrics are needed, **install `linux-cpupower`/turbostat and `modprobe msr`** — RAPL is already exposed by KVM and the kernel module is loaded, but nothing can read it yet.
+5. Thermal/hwmon/EDAC absence is **not actionable** — this is a KVM/Nitro guest; no real sensors or ECC counters are ever passed through, by design.
+6. The `systemd-ssh-generator` AF_VSOCK warnings and the one ACPI MMCONFIG note are cosmetic — no action needed.
+7. No failed systemd units, kernel taint is 0, boot is otherwise clean.

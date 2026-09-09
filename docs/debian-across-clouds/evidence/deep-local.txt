@@ -1,0 +1,127 @@
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+**Premise correction:** this is not a cloud VM. `systemd-detect-virt` → `none`, no `hypervisor` CPUID flag (`grep -c hypervisor /proc/cpuinfo` → 0), DMI reads `LENOVO / 83B1 / Yoga 9 14IRP8`, a battery and AC adapter are present (`/sys/class/power_supply/{ADP0,BAT0}`), and all three cloud metadata endpoints (AWS/GCE/Azure at 169.254.169.254) timed out at 2s (`exit=28`). This is bare-metal consumer hardware. I've reported on the machine that is actually here.
+
+**Side effect to note:** while testing for missing-firmware warnings I ran `update-initramfs -u -k 7.1.8+deb13-amd64`, which rebuilt `/boot/initrd.img-7.1.8+deb13-amd64` (Sep 9 16:27). It completed clean with zero firmware warnings, and it incidentally fixed the r8152 issue in §3.
+
+## 1. IDENTITY
+
+| | |
+|---|---|
+| Platform | Bare metal, Lenovo Yoga 9 14IRP8 (`83B1`), board `LNVNB161216` |
+| BIOS | LENOVO `L4CN31WW`, 2026-06-10 (3 months old) |
+| OS | Debian GNU/Linux 13 (trixie), 13.6 |
+| Kernel | `7.1.8+deb13-amd64` — a **backport** (`7.1.8-1~bpo13+1`), not the trixie default |
+| CPU | 13th Gen Intel Core i7-1360P, family 6 model 186 stepping 2 |
+| Topology | 1 socket, 12 cores / 16 threads (4 P-cores SMT + 8 E-cores), L2 9 MiB, L3 18 MiB, 1 NUMA node |
+| Freq | intel_pstate active, 400 MHz–5.00 GHz, boost on |
+| RAM | 16108896 kB (15 GiB), 15.7 GiB swap partition |
+| Storage | SK hynix `HFS512GEJ9X115N` NVMe, 476.9G; `/` ext4 452G, 6% used |
+| Virtualisation | None as guest; VT-x present as host (`vmx` flag) |
+| Firmware/boot | UEFI, Secure Boot **enabled**, TPM present (`/dev/tpm0`, `/dev/tpmrm0`) |
+
+Uptime 1 day 22:54. Boot: 4.1s kernel + 10.4s userspace.
+
+## 2. DRIVERS
+
+24 PCI functions (`lspci -nnk`). **20 have a driver bound; 4 do not:**
+
+| Device | Driver bound? | Assessment |
+|---|---|---|
+| `00:08.0` GNA Scoring Accelerator `8086:a74f` | **none** | Expected. `intel_gna` was never merged upstream (`modinfo intel_gna` → not found; no match anywhere under `/lib/modules/7.1.8+deb13-amd64`). Not a regression — no in-tree driver exists. |
+| `00:14.2` PCH Shared SRAM `8086:51ef` | **none** | Expected. No Linux driver exists or is needed; it is a PCH scratch BAR. |
+| `00:1f.0` LPC/eSPI Controller `8086:519d` | **none** | Expected. The LPC bridge is claimed by ACPI enumeration, not a PCI driver; its children (EC, PS/2) are driven. |
+| `00:1f.5` SPI (BIOS flash) Controller `8086:51a4` | **none** | Expected and **deliberate**. `spi-intel-pci` is not built in the Debian kernel; leaving it unbound is the distro's choice to prevent BIOS-flash writes from the OS. |
+
+No unbound device here is a real gap.
+
+- **Network:** `iwlwifi` on `00:14.3` (Intel Wi-Fi 6E AX211 160MHz, fw `89.4d42c933.0`); `r8152` for the USB 2.5GbE dock NIC (`enx00e04c69d95d`, 192.168.50.49/24 — this is the live route). Wi-Fi is `DOWN`. Also `docker0` + one `veth`.
+- **Storage:** `nvme` on `01:00.0`. Nothing else.
+- Other notables bound: `i915` (with GuC 70.36.0 + HuC authenticated), `igen6_edac`, `thunderbolt`, `proc_thermal_pci`, `intel_vsec`, `mei_me`, `sof-audio-pci-intel-tgl`, `intel_ish_ipc`.
+
+## 3. FIRMWARE
+
+**Microcode: revision `0x6134`.** Nothing masks it — there is no hypervisor. Note the direction: `intel-microcode 3.20251111.1~deb13u1` is installed and its early cpio *is* in the initrd (`kernel/x86/microcode/GenuineIntel.bin`), but `iucode_tool -l` shows the package ships **rev 0x6133** for sig `0x000b06a2`, while the CPU is already running **0x6134** from the L4CN31WW BIOS. The kernel correctly refuses to downgrade, hence no "updated early" line. `lscpu` confirms: `Old microcode: Not affected`.
+
+**Successful loads:** i915 DMC `adlp_dmc.bin` v2.20, GuC `adlp_guc_70.bin` 70.36.0, HuC `tgl_huc.bin` 7.9.3 (authenticated), SOF DSP `intel/sof/sof-rpl.ri` (2:2:0-57864) + topology, iwlwifi `so-a0-gf-a0-89.ucode`, Bluetooth `intel/ibt-0040-0041.sfi`.
+
+**Firmware packages installed:** yes — `firmware-intel-graphics`, `firmware-intel-misc`, `firmware-iwlwifi`, `firmware-realtek`, `firmware-sof-signed` (all 20250410-2), plus `intel-microcode` and `fwupd`. `/lib/firmware` is 227M.
+
+**Two failures, both benign, for different reasons:**
+
+- `iwl-debug-yoyo.bin (-2)` ×3 — **benign, debug-only**. This is Intel's optional field-debug blob; it is not shipped in `firmware-iwlwifi` by design, and the very next line is `loaded firmware version 89.4d42c933.0`. Nothing is degraded.
+- `rtl_nic/rtl8156b-2.fw (-2)` ×5 → `unable to load firmware patch` — **this was a real miss, now resolved**. Timeline: the NIC probed at t=2.718s; root was not mounted until t=4.073s, so the driver could only see the initrd — and the initrd in use predated `firmware-realtek`, which dpkg shows was installed **2026-09-07 17:35**. The file itself is present on disk (`/lib/firmware/rtl_nic/rtl8156b-2.fw`, 5776 bytes). Separately, that boot-time adapter (MAC `6c:1f:f7:…`) was unplugged at t=436s; the currently attached one loaded the patch fine — `ethtool -i enx00e04c69d95d` reports `firmware-version: rtl8156b-2 v3 10/20/23`. The initramfs rebuild I ran now contains `rtl8156b-2.fw`, so this will not recur.
+
+Also `[Firmware Bug]: TSC ADJUST differs within socket(s), fixing all errors` at t=0.02s — a known Raptor Lake BIOS quirk, self-corrected by the kernel, and itself proof of real silicon.
+
+## 4. KERNEL ERRORS
+
+**Taint value: `0`** — clean. No proprietary or out-of-tree modules, no prior oops, no forced module loads.
+
+`dmesg -l emerg,alert,crit,err`, deduplicated:
+
+| Count | Message | Benign? |
+|---|---|---|
+| 29 + ~40 | `ACPI BIOS Error (bug): Failure creating named object [\_SB.PC00.{XHCI,TXHC}.RHUB.{HS,SS}nn._UPC/._PLD], AE_ALREADY_EXISTS` and the follow-on `ACPI Error: AE_ALREADY_EXISTS, During name lookup/catalog` | **Benign.** Lenovo's DSDT declares USB port `_UPC`/`_PLD` descriptors twice. These are cosmetic port-capability/physical-location hints; duplicates are discarded and USB enumerates normally. A vendor DSDT defect, not a Linux one. |
+| 2 | `ACPI Error: Aborting method \_SB.PC00.LPCB.EC0._Q37/_Q38 due to previous error (AE_NOT_FOUND)` | **Benign in effect.** Two EC query handlers (typically hotkey/charging events) reference an undefined object and abort. Same DSDT defect class. Worth knowing only if a specific hotkey misbehaves. |
+| 12 + 12 warn | `usb 3-2.3: device descriptor read/64, error -71` / `Device not responding to setup address` / `attempt power cycle` | **Not a kernel fault** — a downstream device on the VL813 hub failed enumeration ~6 times before succeeding at t=4.30s as device 8. Cable/hub/bus-power flakiness on the dock chain. Cosmetic unless a device is intermittently missing. |
+| 7 | `i801_smbus 0000:00:1f.4: SMBus is busy, can't use it!` | **Benign.** The Intel ME holds the SMBus; the kernel backs off. Standard on ME-enabled laptops. |
+| 3 | `i2c_hid_acpi i2c-WACF2200:00: device returned incorrect report (0 vs 11 expected)` | **Benign.** Wacom touchscreen digitiser returning a short report during init; it enumerated fine — `Wacom HID 52BE Pen` and `Finger` inputs both exist. |
+| 1 | `intel-hid INTC1078:00: failed to enable HID power button` | **Cosmetic.** The driver falls back; the power button works via ACPI. |
+| 1 each | `igen6_probe … mapping multiple BARs`, `resource sanity check … spans more than PNP0C02:01`, `hpet_acpi_probe: no address or irqs in _CRS`, `i8042: PS/2 appears to have AUX port disabled`, `block nvme0n1: No UUID available providing old NGUID`, `hid-sensor-hub: hid_field_extract() called with n (192) > 32!` | All **benign** — driver-level advisories about firmware resource declarations on a platform with no PS/2 and no legacy HPET wiring. |
+
+**Zero machine checks** — `grep -iE 'mce|machine check|hardware error'` on the full log returns nothing. EDAC counters `mc0`/`mc1`: `ce_count=0`, `ue_count=0`.
+
+## 5. FAILED UNITS
+
+`systemctl is-system-running` → **`running`** (not degraded). `systemctl --failed` and `systemctl --user --failed` are both **empty**. Iterating `NRestarts` over every service unit returned **no unit with a non-zero restart count** — nothing flapped during boot.
+
+Only two `-p err` journal entries this boot, both one-shot and session-scoped:
+- `Failed to start app-gnome-gnome\x2dkeyring\x2dsecrets-2145.scope` — a transient GNOME session scope; keyring is running.
+- `pam_wtmpdb(login:session): update_logout: … did not return SQLITE_DONE: 8` — SQLITE_READONLY on the wtmpdb during logout accounting. Cosmetic; affects `last` records only.
+
+## 6. SYSTEM TOOLS
+
+Checked with `PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin` and cross-checked against `dpkg -l`.
+
+**Present** (several are `/usr/sbin`-only and would look "missing" under a bare login PATH — flagged **†**):
+`lspci` `lsusb` `lsblk` `lshw` `dmidecode`† `hdparm`† `smartctl`† `nvme`† `sensors` `sensors-detect`† `turbostat`† `powertop`† `cpupower` `ethtool`† `iw`† `iwconfig`† `intel_gpu_top` `fwupdmgr` `efibootmgr` `biosdecode`† `x86_energy_perf_policy`† `lscpu` `lsmem` `iotop`† `iostat` `boltctl` `usbhid-dump`. Backing packages confirmed `ii`: `pciutils` `usbutils` `lshw` `dmidecode` `smartmontools` `nvme-cli` `lm-sensors` `linux-cpupower` `intel-gpu-tools` `powertop` `ethtool` `sysstat` `efibootmgr` `fwupd` `thermald`.
+
+**Absent, confirmed by `dpkg` as not installed:**
+`rdmsr`/`wrmsr` (`msr-tools`), `i2cdetect` (`i2c-tools` — status `un`), `perf` (`linux-perf` — `un`), `numactl`, `lstopo` (`hwloc`), `edac-util` (`edac-utils`), `mcelog`, `rasdaemon`/`ras-mc-ctl`, `acpidump`/`acpixtract`/`iasl` (`acpica-tools`), `powerstat`, `stress-ng`, `tlp` (`un`), `tuned`, `nvtop`, `pcm-memory`.
+
+One version caveat: `linux-cpupower` is **6.12.107-1** while the running kernel is **7.1.8**. `turbostat` still produced a full, sane table (PkgWatt 11.15, PkgTmp 54°C, UncMHz 4000, all C-states) — but a >1 major-version skew is where turbostat silently drops newly-added counters.
+
+## 7. GAPS
+
+**Present on this machine but not observable/controllable with what's installed:**
+
+| Facility (verified present) | Missing tool → package |
+|---|---|
+| EDAC memory controllers `mc0`/`mc1` bound via `igen6_edac`, CE/UE counters live | No `edac-util`, no daemon to record or alert on a rising CE count → **`rasdaemon`** (preferred; supersedes `edac-utils` + `mcelog`) |
+| Machine-check architecture (`mce` PMU exposed) | Nothing decodes or persists an MCE if one fires → **`rasdaemon`** |
+| Full PMU set: `cpu_core`, `cpu_atom` (hybrid), `intel_pt`, `intel_bts`, `uncore_imc_0/1`, `uncore_cbox_0-5`, `uncore_arb`, `cstate_*`, `power`, `msr` — all in `/sys/bus/event_source/devices/`, `perf_event_paranoid=3` | **No `perf` at all** → **`linux-perf`** (also drop paranoid to 1 or 2 for non-root use). Caveat: Debian's `linux-perf` targets 6.12; against a 7.1.8 backport kernel expect a version-mismatch warning |
+| MSRs: `msr` module loaded, `/dev/cpu/0/msr` exists | No `rdmsr`/`wrmsr` → **`msr-tools`** |
+| SMBus: `i801_smbus` bound on `00:1f.4` | No `i2cdetect`/`i2cget` → **`i2c-tools`** (note the 7× "SMBus is busy" — the ME contends for this bus; probing a laptop SMBus is not risk-free) |
+| 37 ACPI tables in `/sys/firmware/acpi/tables` (DSDT + 16 SSDTs) — directly relevant to the ~70 DSDT errors in §4 | No `acpidump`/`iasl` to dump and disassemble → **`acpica-tools`** |
+| Hybrid P/E-core cache and topology layout | No `lstopo` → **`hwloc`** (`numactl` adds little here — single NUMA node) |
+| Thunderbolt domain0 with one device | `boltctl` **is** present — no gap |
+| DPTF/INT3400 policy knobs, `platform_profile` (`low-power balanced performance`, currently `performance`) | `thermald` is active and managing this — no gap |
+
+**Instrumentation genuinely absent from this box — and it is hardware/driver reality, not masking:**
+
+Very little is actually missing. **10 thermal zones** are live (`acpitz`, `SEN1–SEN4`, `TCPU` 57°C, `TCPU_PCI`, `x86_pkg_temp`, `INT3400`, `iwlwifi_1`) plus 22 cooling devices; **RAPL is present** (`intel-rapl:0` package-0 with `core`/`uncore` subdomains, plus `intel-rapl-mmio`); six hwmon instances (`coretemp`, `nvme`, `BAT0`, `ADP0`, `acpitz`, `iwlwifi`).
+
+Two real absences: **`intel_gna`** has no in-tree driver, so `00:08.0` is permanently dark — hardware present, driver nonexistent. And **RAPL `energy_uj` returns `Permission denied` to non-root** — that is not missing instrumentation but the deliberate post-CVE-2020-8694 (PLATYPUS) permission hardening; root and `turbostat` read it fine (PkgWatt 11.15 / CorWatt 6.75 measured).
+
+**How you tell hypervisor-masking from hardware-lacking:** on a VM the tell is a cluster of positives — `systemd-detect-virt` naming the hypervisor, the `hypervisor` CPUID bit set, DMI vendor reading QEMU/Amazon/Google/Microsoft, and *no* `/sys/class/power_supply`, *no* `coretemp`, *no* `intel-rapl`, *no* EDAC. Here every one of those points the other way: detect-virt `none`, hypervisor bit 0, DMI `LENOVO`, and RAPL/coretemp/EDAC/battery all populated. So on this machine there is nothing to disambiguate — every absence is a driver or silicon fact.
+
+## VERDICT
+
+1. **Install `rasdaemon`.** EDAC is bound with live CE/UE counters and there is nothing recording them — you will not learn about degrading DIMMs or a machine check until something crashes. Highest-value single package here.
+2. **Install `linux-perf`** — a full hybrid PMU (`cpu_core`/`cpu_atom`/`intel_pt`/uncore IMC) is exposed and completely unusable today. Expect a 6.12-vs-7.1.8 version warning.
+3. **Verify the r8152 fix on next boot.** The initramfs I rebuilt now carries `rtl8156b-2.fw`; confirm `dmesg | grep rtl8156b` is silent, since your only live network route is that USB NIC.
+4. **`fwupdmgr` reports pending updates** for the SK hynix SSD, ELAN touchpad, Integrated Camera, SBAT and several UEFI CA entries. `fwupdmgr update` on AC power — the SSD update needs external power and a reboot.
+5. **`linux-cpupower` is 6.12.107 against a 7.1.8 kernel.** turbostat works but may silently omit newer counters; pin expectations accordingly if you rely on its numbers.
+6. **Wi-Fi is `DOWN`** and the machine is single-homed on a USB dock NIC. Fine if intentional; a dock unplug is a total network loss otherwise.
+7. **Everything else is clean:** taint 0, no failed units, no restart loops, no MCEs, SMART `Critical Warning 0x00` / 1% used / 0 integrity errors, Secure Boot on, TPM present. The ~70 ACPI errors are Lenovo DSDT duplicate-`_UPC` noise — do not chase them.
+8. **Non-action:** `intel_gna` (`00:08.0`) will stay unbound forever; the Goodix `27c6:550c` fingerprint reader is present but unsupported and `fprintd` is inactive, which matches what you already established.

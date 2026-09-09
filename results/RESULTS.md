@@ -13,7 +13,11 @@ too noisy for that number to be worth comparing.
 | host | os | platform | cpu | threads | mem MiB | gpu | runs | latest run |
 |---|---|---|---|---|---|---|---|---|
 | yoga9i | Debian GNU/Linux 13 (trixie) | bare metal | Intel Core i7-10750H | 12 | 15663 | NVIDIA GeForce GTX 1650 Ti with Max-Q Design | 3 | `20260904T141502Z-yoga9i` |
-| debian | Debian GNU/Linux 13 (trixie) | bare metal | 13th Gen Intel Core i7-1360P | 16 | 15731 | - | 1 | `20260908T165649Z-debian` |
+| debian | Debian GNU/Linux 13 (trixie) | bare metal | 13th Gen Intel Core i7-1360P | 16 | 15731 | - | 2 | `20260909T182944Z-debian` |
+| ip-172-31-9-2 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T173205Z-ip-172-31-9-2` |
+| ip-172-31-6-191 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T181947Z-ip-172-31-6-191` |
+| baseline-pristine-azure | Debian GNU/Linux 13 (trixie) | microsoft | Intel Xeon 6973P-C | 2 | 7942 | - | 1 | `20260909T182313Z-baseline-pristine-azure` |
+| baseline-pristine-gce | Debian GNU/Linux 13 (trixie) | google | INTEL XEON PLATINUM 8581C | 2 | 6936 | - | 1 | `20260909T182643Z-baseline-pristine-gce` |
 
 ## Runs
 
@@ -23,6 +27,11 @@ too noisy for that number to be worth comparing.
 | `20260904T140830Z` | 2026-09-04T14:08:30Z | yoga9i | baseline | 3 | 3 | 8 | 0 | 0 |
 | `20260904T141502Z-yoga9i` | 2026-09-04T14:15:02Z | yoga9i | baseline-native | 3 | 3 | 9 | 0 | 0 |
 | `20260908T165649Z-debian` | 2026-09-08T16:56:49Z | debian | - | 3 | 3 | 7 | 2 | 0 |
+| `20260909T173205Z-ip-172-31-9-2` | 2026-09-09T17:32:05Z | ip-172-31-9-2 | - | 3 | 3 | 7 | 2 | 0 |
+| `20260909T181947Z-ip-172-31-6-191` | 2026-09-09T18:19:47Z | ip-172-31-6-191 | - | 3 | 3 | 7 | 2 | 0 |
+| `20260909T182313Z-baseline-pristine-azure` | 2026-09-09T18:23:13Z | baseline-pristine-azure | - | 3 | 3 | 7 | 2 | 0 |
+| `20260909T182643Z-baseline-pristine-gce` | 2026-09-09T18:26:43Z | baseline-pristine-gce | - | 3 | 3 | 7 | 2 | 0 |
+| `20260909T182944Z-debian` | 2026-09-09T18:29:44Z | debian | - | 3 | 3 | 7 | 2 | 0 |
 
 ## Measurements
 
@@ -126,6 +135,91 @@ too noisy for that number to be worth comparing.
 | `20260908T165649Z-debian` | debian | crypto | sha256 | 2396.3 | MB/s | ^ | 0.4 | 3 |
 | `20260908T165649Z-debian` | debian | crypto | aes_256_cbc | 1771.83 | MB/s | ^ | 0.1 | 3 |
 | `20260908T165649Z-debian` | debian | network | pipe_throughput | 4600 | MB/s | ^ | 15.2 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | cpu-single | int | 3.61971e+08 | ops/s | ^ | 0.1 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | cpu-single | float | 3.24902e+09 | ops/s | ^ | 0.2 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | cpu-single | sieve | 3.46774e+08 | ops/s | ^ | 0.7 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | cpu-multi | threads_1 | 3.62073e+08 | ops/s | ^ | 0.2 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | cpu-multi | threads_all | 7.01374e+08 | ops/s | ^ | 0.2 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | cpu-multi | scaling_efficiency | 96.855 | % | ^ | 0.0 | 1 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | memory | read | 10.1527 | GiB/s | ^ | 0.3 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | memory | write | 11.216 | GiB/s | ^ | 0.6 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | memory | copy | 18.5889 | GiB/s | ^ | 0.6 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | memory | triad | 11.5504 | GiB/s | ^ | 0.1 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | memory | latency | 134.838 | ns | v | 0.2 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | disk | seq_write | 173 | MB/s | ^ | 0.0 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | disk | seq_read | 131 | MB/s | ^ | 0.0 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | disk | fsync_latency | 3.22283 | ms | v | 1.7 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | crypto | sha256 | 1568.39 | MB/s | ^ | 0.0 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | crypto | aes_256_cbc | 1159.16 | MB/s | ^ | 0.0 | 3 |
+| `20260909T173205Z-ip-172-31-9-2` | ip-172-31-9-2 | network | pipe_throughput | 4000 | MB/s | ^ | 15.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | cpu-single | int | 3.62242e+08 | ops/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | cpu-single | float | 1.83754e+09 | ops/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | cpu-single | sieve | 3.58498e+08 | ops/s | ^ | 0.3 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | cpu-multi | threads_1 | 3.62183e+08 | ops/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | cpu-multi | threads_all | 7.02288e+08 | ops/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | cpu-multi | scaling_efficiency | 96.952 | % | ^ | 0.0 | 1 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | memory | read | 7.84184 | GiB/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | memory | write | 11.59 | GiB/s | ^ | 0.7 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | memory | copy | 19.6426 | GiB/s | ^ | 0.2 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | memory | triad | 11.6388 | GiB/s | ^ | 0.3 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | memory | latency | 130.306 | ns | v | 0.9 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | disk | seq_write | 173 | MB/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | disk | seq_read | 131 | MB/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | disk | fsync_latency | 3.22521 | ms | v | 0.6 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | crypto | sha256 | 1567.9 | MB/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | crypto | aes_256_cbc | 1158.73 | MB/s | ^ | 0.0 | 3 |
+| `20260909T181947Z-ip-172-31-6-191` | ip-172-31-6-191 | network | pipe_throughput | 4300 | MB/s | ^ | 7.0 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | cpu-single | int | 4.64687e+08 | ops/s | ^ | 0.1 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | cpu-single | float | 2.71954e+09 | ops/s | ^ | 0.0 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | cpu-single | sieve | 4.24943e+08 | ops/s | ^ | 0.0 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | cpu-multi | threads_1 | 4.64368e+08 | ops/s | ^ | 0.1 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | cpu-multi | threads_all | 8.89465e+08 | ops/s | ^ | 0.0 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | cpu-multi | scaling_efficiency | 95.771 | % | ^ | 0.0 | 1 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | memory | read | 16.0294 | GiB/s | ^ | 1.4 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | memory | write | 8.31319 | GiB/s | ^ | 1.4 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | memory | copy | 26.1131 | GiB/s | ^ | 0.9 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | memory | triad | 17.3809 | GiB/s | ^ | 0.1 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | memory | latency | 136.42 | ns | v | 4.4 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | disk | seq_write | 192 | MB/s | ^ | 0.5 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | disk | seq_read | 207 | MB/s | ^ | 0.5 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | disk | fsync_latency | 3.2557 | ms | v | 4.7 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | crypto | sha256 | 2014.38 | MB/s | ^ | 0.1 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | crypto | aes_256_cbc | 1487.14 | MB/s | ^ | 0.0 | 3 |
+| `20260909T182313Z-baseline-pristine-azure` | baseline-pristine-azure | network | pipe_throughput | 2300 | MB/s | ^ | 13.0 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | cpu-single | int | 4.43348e+08 | ops/s | ^ | 0.2 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | cpu-single | float | 2.2489e+09 | ops/s | ^ | 0.5 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | cpu-single | sieve | 4.92115e+08 | ops/s | ^ | 0.4 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | cpu-multi | threads_1 | 4.43576e+08 | ops/s | ^ | 0.1 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | cpu-multi | threads_all | 8.6056e+08 | ops/s | ^ | 0.0 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | cpu-multi | scaling_efficiency | 97.003 | % | ^ | 0.0 | 1 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | memory | read | 7.14905 | GiB/s | ^ | 0.3 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | memory | write | 6.85015 | GiB/s | ^ | 0.1 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | memory | copy | 26.323 | GiB/s | ^ | 0.4 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | memory | triad | 12.4045 | GiB/s | ^ | 0.9 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | memory | latency | 81.8307 | ns | v | 1.2 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | disk | seq_write | 191 | MB/s | ^ | 0.5 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | disk | seq_read | 178 | MB/s | ^ | 0.0 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | disk | fsync_latency | 1.48891 | ms | v | 15.6 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | crypto | sha256 | 1920.53 | MB/s | ^ | 1.0 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | crypto | aes_256_cbc | 1416.44 | MB/s | ^ | 0.2 | 3 |
+| `20260909T182643Z-baseline-pristine-gce` | baseline-pristine-gce | network | pipe_throughput | 3700 | MB/s | ^ | 48.6 | 3 |
+| `20260909T182944Z-debian` | debian | cpu-single | int | 5.50741e+08 | ops/s | ^ | 0.2 | 3 |
+| `20260909T182944Z-debian` | debian | cpu-single | float | 2.79026e+09 | ops/s | ^ | 0.6 | 3 |
+| `20260909T182944Z-debian` | debian | cpu-single | sieve | 6.30449e+08 | ops/s | ^ | 1.1 | 3 |
+| `20260909T182944Z-debian` | debian | cpu-multi | threads_1 | 5.49992e+08 | ops/s | ^ | 0.8 | 3 |
+| `20260909T182944Z-debian` | debian | cpu-multi | threads_all | 6.38578e+09 | ops/s | ^ | 0.1 | 3 |
+| `20260909T182944Z-debian` | debian | cpu-multi | scaling_efficiency | 72.567 | % | ^ | 0.0 | 1 |
+| `20260909T182944Z-debian` | debian | memory | read | 16.4271 | GiB/s | ^ | 2.8 | 3 |
+| `20260909T182944Z-debian` | debian | memory | write | 14.2263 | GiB/s | ^ | 1.1 | 3 |
+| `20260909T182944Z-debian` | debian | memory | copy | 41.989 | GiB/s | ^ | 0.7 | 3 |
+| `20260909T182944Z-debian` | debian | memory | triad | 22.112 | GiB/s | ^ | 1.1 | 3 |
+| `20260909T182944Z-debian` | debian | memory | latency | 98.8964 | ns | v | 0.8 | 3 |
+| `20260909T182944Z-debian` | debian | disk | seq_write | 3300 | MB/s | ^ | 9.1 | 3 |
+| `20260909T182944Z-debian` | debian | disk | seq_read | 5400 | MB/s | ^ | 3.7 | 3 |
+| `20260909T182944Z-debian` | debian | disk | fsync_latency | 0.526795 | ms | v | 6.9 | 3 |
+| `20260909T182944Z-debian` | debian | crypto | sha256 | 2387.65 | MB/s | ^ | 0.7 | 3 |
+| `20260909T182944Z-debian` | debian | crypto | aes_256_cbc | 1764.02 | MB/s | ^ | 0.3 | 3 |
+| `20260909T182944Z-debian` | debian | network | pipe_throughput | 4600 | MB/s | ^ | 28.3 | 3 |
 
 ## Warnings
 
