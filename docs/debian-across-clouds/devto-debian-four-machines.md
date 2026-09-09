@@ -32,7 +32,7 @@ Four hosts, all Debian 13 (trixie), all measured on 2026-09-09:
 | **local** | installed, bare metal | Lenovo 83B1 | i7-1360P, Raptor Lake, 16 threads | `7.1.8+deb13-amd64` (backports) |
 | **AWS** | `ami-0871da4641e8b4413` | c7i.large | Xeon 8488C, Sapphire Rapids, 2 vCPU | `6.12.107+deb13-cloud-amd64` |
 | **GCE** | `debian-13-trixie-v20260908` | c4-standard-2 | Xeon 8581C, Emerald Rapids, 2 vCPU | `6.12.107+deb13-cloud-amd64` |
-| **Azure** | `Debian:debian-13:13-gen2:0.20260831.2587` | Standard_D2s_v7 | Xeon 6973P-C, Granite Rapids, 2 vCPU | `6.12.107+deb13-cloud-amd64` |
+| **Azure** | `Debian:debian-13:13-gen2:0.20260831.2587` | `Standard_D2s_v7` | Xeon 6973P-C, Granite Rapids, 2 vCPU | `6.12.107+deb13-cloud-amd64` |
 
 One detail decides how to read everything below. **The AWS and Azure images are the same upstream Debian build** — `2587`, dated 2026-08-31 — running the same kernel. GCE builds its own, a week newer. So where AWS and Azure differ, the distro is not the variable. The platform is.
 
@@ -244,7 +244,7 @@ Same kernel. Same message. On one machine it is a defect you must fix; on anothe
 
 Worth stating plainly, because it is the larger part of the result. On all four machines: **kernel taint 0**, **zero failed systemd units**, `is-system-running: running`, and every PCI device with a real function had its driver bound. On all three clouds: **zero firmware-load attempts and zero firmware packages** — which is consistent rather than broken, because `ena`, `gve`, `mana`, `nvme` and `virtio` request no blobs.
 
-The shared noise is shared exactly: `systemd-ssh-generator` fails its AF_VSOCK probe every boot on all three clouds, none of which expose a working vsock CID.
+The shared noise is shared exactly: `systemd-ssh-generator` fails its `AF_VSOCK` probe every boot on all three clouds, none of which expose a working vsock CID.
 
 ## Cheat Sheet
 

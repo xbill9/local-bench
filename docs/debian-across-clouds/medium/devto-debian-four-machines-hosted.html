@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Four Debian 13 Boxes, One Brief: 1,923 Packages on Metal, 328 in the Cloud, and the Backup GPT Header Nobody Relocated</title>
+  <meta name="description" content="The same Debian 13 on a laptop and on AWS, GCE and Azure. The cloud images ship 328-350 packages against 1,923 on metal, no firmware package at all, and no tool to read the NVMe they all boot from. Each machine was then given the same brief and asked to analyse itself. Three of them agreed. The fourth found a partition table its own resize had broken." />
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+    body{font-family:-apple-system,'Segoe UI',Roboto,'Liberation Sans',Arial,sans-serif;
+         font-size:18px;line-height:1.58;max-width:42em;color:#242424;}
+    h1,h2,h3,h4{font-weight:700;line-height:1.25;margin-top:1.8em;}
+    h4{font-size:1.25em;}
+    img{max-width:100%;height:auto;display:block;margin:1.6em 0;}
+    pre{background:#f7f7f7;border:1px solid #e6e6e6;border-radius:4px;
+        padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.45;}
+    code{font-family:'Liberation Mono',Menlo,Consolas,monospace;}
+    :not(pre)>code{background:#f2f2f2;padding:1px 5px;border-radius:3px;font-size:.9em;}
+    blockquote{border-left:3px solid #ddd;margin-left:0;padding-left:1em;color:#555;}
+    hr{border:0;border-top:1px solid #e6e6e6;margin:2.4em 0;}
+  </style>
+</head>
+<body>
+<figure><img src="https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/medium/img/devto-cover.ce332564.jpg" alt="Four Debian 13 Boxes, One Brief: 1,923 Packages on Metal, 328 in the Cloud, and the Backup GPT Header Nobody Relocated" /></figure>
+<p>This article covers one afternoon of running the same Debian 13 on
+four machines — one laptop and three clouds — and asking each of them
+the same question about its own hardware.</p>
+<p><strong>A cloud image is not a small Debian. It is a different bet
+about what you will need.</strong> The laptop install carries 1,923
+packages. The three cloud images carry 328, 337 and 350. That is not a
+rounding difference, and the interesting part is not the count — it is
+that all four are booting from NVMe, and only two of them ship anything
+that can read an NVMe health log.</p>
+<p>What that creates is a gap with two halves. The hardware is present
+and the kernel can see it. The default toolset cannot. And because
+nothing fails, nothing tells you:</p>
+<ul>
+<li>Every cloud image ships <strong>zero firmware packages</strong> and
+logs <strong>zero firmware load attempts</strong> — consistent, not
+broken, and you have to check to know which.</li>
+<li><strong>AWS and Azure ship no <code>nvme-cli</code></strong>, on
+machines whose only disk is NVMe.</li>
+<li><strong>GCE alone</strong> ships <code>dmidecode</code> and
+<code>nvme-cli</code>. It is the most complete of the three by a clear
+margin.</li>
+<li>Azure reports
+<strong><code>Vulnerability Retbleed: Vulnerable</code></strong>. AWS
+and GCE do not.</li>
+<li>AWS carries a <strong>backup GPT header its own volume resize never
+relocated</strong> — <code>GPT:16777215 != 41943039</code>, still wrong
+at the boot I measured. GCE emits the identical warning and
+<strong>fixes it in the same boot</strong>.</li>
+</ul>
+<p>That last pair is the whole article. Same kernel, same message,
+opposite correct answers.</p>
+<p><a
+href="https://github.com/xbill9/local-bench">https://github.com/xbill9/local-bench</a></p>
+<h4 id="the-machines">The Machines</h4>
+<p>Four hosts, all Debian 13 (trixie), all measured on 2026-09-09:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/medium/img/devto-debian-four-machines-table-1.png"
+alt="Table: Image, Shape, CPU, Kernel" /></p>
+<p>One detail decides how to read everything below. <strong>The AWS and
+Azure images are the same upstream Debian build</strong> —
+<code>2587</code>, dated 2026-08-31 — running the same kernel. GCE
+builds its own, a week newer. So where AWS and Azure differ, the distro
+is not the variable. The platform is.</p>
+<h4 id="at-this-point-you-should-have">At This Point You Should
+Have</h4>
+<ul>
+<li>An account on whichever clouds you want to compare, and the CLI for
+each already authenticated</li>
+<li>The ability to launch a VM and throw it away</li>
+<li><code>ssh</code>, and a key you are willing to put on a throwaway
+host</li>
+<li>Somewhere durable to write findings that is not your shell
+scrollback</li>
+</ul>
+<p>Steps 0 through 2 are reads and launches. Step 3 installs software,
+and <strong>Step 3 is the point of no return for the baseline</strong> —
+see Step 1 for why that ordering is not optional.</p>
+<h4 id="step-0--pin-the-image-not-the-family">Step 0 — Pin the Image,
+Not the Family</h4>
+<p>An image family is a moving target, and "Debian 13" is not a
+measurement. Resolve it to an ID before you launch anything, and write
+the ID down.</p>
+<pre class="bash"><code># AWS — the official Debian account is 136693071363
+aws ec2 describe-images --owners 136693071363 \
+  --filters &quot;Name=name,Values=debian-13-amd64-*&quot; &quot;Name=state,Values=available&quot; \
+  --query &#39;sort_by(Images,&amp;CreationDate)[-1].{Name:Name,ID:ImageId,Date:CreationDate}&#39;
+ 
+# GCE — resolve the family to the image it currently points at
+gcloud compute images describe-from-family debian-13 \
+  --project debian-cloud --format=&quot;value(name)&quot;
+ 
+# Azure — the stable offer is debian-13; debian-13-daily is a different thing
+az vm image list --publisher Debian --offer debian-13 --sku 13-gen2 --all \
+  --query &quot;[?offer==&#39;debian-13&#39;] | sort_by(@,&amp;version)[-1].urn&quot; -o tsv</code></pre>
+<p>That third one has a trap in it. Asking Azure for
+<code>--offer debian-13</code> with <code>--all</code> will happily
+return <code>debian-13-daily</code> URNs alongside the stable ones,
+because the filter matches loosely. The
+<code>[?offer=='debian-13']</code> clause is doing real work — without
+it you will pin a daily build and not notice.</p>
+<p>This is also where the AWS/Azure coincidence shows up: both resolved
+to build <code>2587</code>, dated 2026-08-31. That is not a fluke, it is
+the same upstream Debian cloud image, and it is the single most useful
+fact for interpreting the rest.</p>
+<h4 id="step-1--scan-before-you-install-anything">Step 1 — Scan Before
+You Install Anything</h4>
+<p><strong>This step exists because I got it wrong the first
+time.</strong></p>
+<p>The first EC2 instance I launched had a <code>user-data</code> script
+that installed about twenty packages before I ever logged in. Then I
+scanned it and wrote down what was present. Every one of those findings
+was worthless: I was measuring my own cloud-init, not Debian's image.
+That instance had to be discarded and relaunched with no
+<code>user-data</code> at all.</p>
+<p>A default-install analysis has exactly one chance to be correct, and
+it is before the first <code>apt-get install</code>.</p>
+<p>The scanner has to run on a machine where nothing is installed, which
+means it can only use what a minimal cloud image actually ships — bash,
+coreutils, <code>/proc</code>, <code>/sys</code>, <code>dpkg</code>. No
+<code>jq</code>. No <code>lspci</code>, because <code>pciutils</code>
+might not be there. Absence is the data, so nothing may fail:</p>
+<pre class="bash"><code># hardware, without needing dmidecode
+for f in sys_vendor product_name bios_version bios_date; do
+  [ -r &quot;/sys/class/dmi/id/$f&quot; ] &amp;&amp; printf &#39;%-16s %s\n&#39; &quot;$f&quot; &quot;$(cat /sys/class/dmi/id/$f)&quot;
+done
+ 
+# what the image actually ships, by dpkg, not by PATH
+for p in pciutils usbutils dmidecode nvme-cli smartmontools lm-sensors \
+         ethtool intel-microcode fwupd build-essential gcc git unzip; do
+  s=$(dpkg-query -f &#39;${db:Status-Status}&#39; -W &quot;$p&quot; 2&gt;/dev/null)
+  [ &quot;$s&quot; = installed ] &amp;&amp; echo &quot;PRESENT $p&quot; || echo &quot;absent  $p&quot;
+done</code></pre>
+<p><strong>Check packages with <code>dpkg</code>, not with
+<code>command -v</code>.</strong> This is the second thing I got wrong,
+and it is worth more than the first. My initial pass over the laptop
+reported <code>dmidecode</code>, <code>nvme-cli</code>,
+<code>smartmontools</code>, <code>hdparm</code>, <code>ethtool</code>,
+<code>powertop</code> and <code>turbostat</code> as missing. All seven
+were installed. My login <code>PATH</code> contained no
+<code>/usr/sbin</code>, no <code>/sbin</code>, no
+<code>/usr/local/sbin</code>, and a bare <code>command -v</code> cannot
+see a binary it has no path to. Seven false negatives from one unstated
+assumption, on the machine I know best.</p>
+<p>The full scanner is <code>evidence/baseline-scan.sh</code> in the
+repo. Run it, keep the output, then install things.</p>
+<h4 id="step-2--launch-pristine">Step 2 — Launch Pristine</h4>
+<p>No <code>user-data</code>, no startup script, no custom image. Lock
+SSH to your own address rather than the world — every one of these CLIs
+will happily open port 22 to <code>0.0.0.0/0</code> if you let it.</p>
+<pre class="bash"><code>MYIP=$(curl -s https://checkip.amazonaws.com)/32
+ 
+# AWS
+aws ec2 run-instances --image-id &lt;ami&gt; --instance-type c7i.large \
+  --key-name &lt;key&gt; --security-group-ids &lt;sg&gt; --subnet-id &lt;subnet&gt; \
+  --associate-public-ip-address --metadata-options &#39;HttpTokens=required&#39;
+ 
+# GCE
+gcloud compute instances create baseline --zone=us-east1-b \
+  --machine-type=c4-standard-2 --image-family=debian-13 --image-project=debian-cloud
+ 
+# Azure — --nsg-rule SSH opens 22 to the internet; narrow it afterwards
+az vm create -g &lt;rg&gt; -n baseline --image &lt;urn&gt; --size Standard_D2s_v7 \
+  --admin-username azureuser --ssh-key-values ~/.ssh/id_ed25519.pub --nsg-rule SSH
+az network nsg rule update -g &lt;rg&gt; --nsg-name baselineNSG --name default-allow-ssh \
+  --source-address-prefixes &quot;$MYIP&quot;</code></pre>
+<p>Azure will also refuse a size that is not offered to your
+subscription in that region, and the CLI reports it badly — mine crashed
+inside its own error handler with
+<code>RuntimeError: The content for this response was already consumed</code>,
+having created nothing. The real cause was that
+<code>Standard_D2s_v6</code> does not exist for that subscription in
+<code>eastus</code>. Ask before you launch:</p>
+<pre class="bash"><code>az vm list-skus -l eastus --size Standard_D2s_v7 \
+  --query &quot;[].{Name:name,Restrictions:restrictions[].reasonCode}&quot; -o json</code></pre>
+<p>An empty array means the SKU is not available to you. That is the
+answer the failed deployment was trying to give.</p>
+<h4
+id="step-3--install-claude-code-and-notice-what-it-does-not-need">Step 3
+— Install Claude Code, and Notice What It Does Not Need</h4>
+<pre class="bash"><code>curl -fsSL https://claude.ai/install.sh | bash</code></pre>
+<p>On all three clouds, on images with <strong>no <code>node</code>, no
+<code>npm</code>, no <code>unzip</code> and no compiler</strong>:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/medium/img/devto-debian-four-machines-table-2.png"
+alt="Table: AWS, GCE, Azure" /></p>
+<p><code>ldd</code> on the binary returns <code>linux-vdso</code>,
+<code>librt</code>, <code>libc</code>, <code>libpthread</code>,
+<code>libdl</code>, <code>ld-linux</code> — glibc 2.41 and nothing else.
+The prerequisites are <code>curl</code> and a writable
+<code>$HOME</code>, and every one of these images has both.</p>
+<p>All three printed the same warning:
+<code>~/.local/bin is not in your PATH</code>. Debian's
+<code>~/.profile</code> adds that directory only if it exists <strong>at
+login</strong>, and the installer creates it mid-session. Three for
+three, and it resolves itself on the next login.</p>
+<h4 id="step-4--give-each-machine-the-same-brief">Step 4 — Give Each
+Machine the Same Brief</h4>
+<p>This is the part that changes the result. Rather than SSH-ing in and
+running commands from outside, install Claude Code on each box and have
+it examine the machine it is running on:</p>
+<pre class="bash"><code>claude -p &quot;$(cat brief.txt)&quot; --allowedTools Bash</code></pre>
+<p><code>--allowedTools Bash</code> pre-approves the one tool the job
+needs. The blunter <code>--permission-mode bypassPermissions</code>
+disables the permission system wholesale and is the wrong instrument
+here.</p>
+<p>The brief asks for seven things in order — identity, drivers,
+firmware, kernel errors, failed units, system tools, gaps — and ends by
+asking for a verdict of at most eight lines. The full text is
+<code>evidence/deep-analysis-prompt.txt</code>.</p>
+<p>One clause in it earned its place:</p>
+<blockquote>
+<p>IMPORTANT: check with an explicit PATH that includes /usr/sbin, /sbin
+and /usr/local/sbin, and cross-check against dpkg — a tool in /usr/sbin
+is NOT missing just because a bare <code>command -v</code> under a login
+PATH cannot see it. This exact mistake has already been made once in
+this project.</p>
+</blockquote>
+<p>Without it, four machines would have independently reproduced my Step
+1 error. With it, the Azure instance flagged <code>ethtool</code> as
+"the tool a bare login-PATH <code>command -v</code> missed earlier in
+this project" — it had read the warning and applied it.</p>
+<p><strong>One caveat, and it is mine.</strong> The brief says "use your
+Bash tool" and never says read-only. The laptop's instance ran
+<code>update-initramfs -u</code> during its analysis, rebuilt the boot
+image, and said so at the top of its report. The result was benign — it
+incidentally shipped the <code>rtl8156b-2.fw</code> blob that had been
+missing from that initrd — and the three cloud instances wrote nothing.
+But that was the brief's luck, not its design. <strong>If you reuse
+this, say read-only.</strong></p>
+<h4 id="what-the-default-image-ships">What the Default Image Ships</h4>
+<p><code>dpkg</code>-verified, on pristine images, before anything was
+installed:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/medium/img/devto-debian-four-machines-table-3.png"
+alt="Table: Package, local, AWS, GCE, Azure" /></p>
+<p>Five packages are universal. Everything else is a choice, and
+<strong>GCE makes the most generous one</strong> — it is the only image
+of the three that can inspect its own disk or decode its own SMBIOS out
+of the box.</p>
+<h4 id="what-the-hypervisor-takes-away">What the Hypervisor Takes
+Away</h4>
+<p>The gap has a second half that no package closes. Some facilities are
+absent because the hypervisor does not expose them, and installing the
+tool achieves nothing:</p>
+<p><img src="https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/medium/img/devto-debian-four-machines-table-4.png"
+alt="Table: local, AWS, GCE, Azure" /></p>
+<p>Two of these repay a second look.</p>
+<p><strong>AWS's RAPL is not simply missing.</strong> The instance found
+<code>intel_rapl_msr</code> and <code>intel_rapl_common</code> loaded
+and a <code>psys</code> PMU domain registered — KVM is exposing the MSRs
+— but <code>/sys/class/powercap</code> is empty because the
+<code>msr</code> module is not loaded and no reader is installed. On
+AWS, power is recoverable with <code>linux-cpupower</code> and a
+<code>modprobe</code>. On GCE and Azure, RAPL is not virtualised at all,
+and no tooling will bring it back. Those two states look identical from
+a distance and are not the same problem.</p>
+<p><strong>GCE and Azure mask the microcode revision</strong> to
+<code>0xffffffff</code>. AWS reports a real one. If your compliance
+story involves auditing microcode level in-guest, it works on one of
+these three.</p>
+<h4 id="the-gpt-header-and-why-only-the-machine-could-tell">The GPT
+Header, and Why Only the Machine Could Tell</h4>
+<p>AWS and GCE both emit this during boot:</p>
+<pre><code>GPT:16777215 != 41943039
+GPT: Use GNU Parted to correct GPT errors.</code></pre>
+<p>16,777,215 sectors is 8 GiB. 41,943,039 is 20 GiB. Both disks were
+created at 8 GiB and requested at 20; the primary GPT was updated and
+the backup header at the end of the disk was not moved to match. The
+kernel falls back to the primary and boots.</p>
+<p>On AWS it is <strong>still wrong</strong>. The instance ranked it as
+action item #1 and gave the fix:</p>
+<pre class="bash"><code>sudo sgdisk -e /dev/nvme0n1</code></pre>
+<p>On GCE the same warning appears at t=1.95s and t=2.23s and is then
+<strong>corrected inside the same boot</strong>, because Google ships
+<code>gce-disk-expand</code> in the image and AWS ships nothing
+equivalent. Azure never emits it at all.</p>
+<p>Same kernel. Same message. On one machine it is a defect you must
+fix; on another it is a transient you must ignore. Nothing in the
+message says which, and no amount of reading the message from outside
+the machine would tell you — you need the boot timeline, the package
+list and the agent's behaviour together.</p>
+<h4 id="three-findings-you-only-get-from-the-inside">Three Findings You
+Only Get From the Inside</h4>
+<p><strong>Azure is exposed to Retbleed.</strong> <code>lscpu</code>
+reports <code>Vulnerability Retbleed: Vulnerable</code>, tied to the
+microcode Hyper-V presents to the guest. AWS and GCE report no such
+thing. There is no in-guest fix; it depends on Azure host-side updates.
+Azure also has Secure Boot <strong>and</strong> vTPM available and
+<strong>both disabled</strong> on a default VM.</p>
+<p><strong>GCE fails a boot step every time.</strong> The
+<code>hwclock</code> binary is absent, so
+<code>google_guest_agent</code>'s clock-skew-setup step fails on every
+boot. Impact is near zero — <code>kvm-clock</code> is authoritative —
+but it is a permanent error in a log nobody reads.</p>
+<p><strong>Azure has zero unbound PCI devices.</strong> It presents
+three PCI devices, all bound, plus thirteen VMBus devices, all bound.
+AWS presents about 45 with four unbound legacy stubs (440FX, PIIX3 ISA,
+PIIX4 ACPI, an emulated VGA); GCE presents 15 with three. Hyper-V Gen2
+emulates no legacy chipset at all, and AWS still boots <strong>legacy
+BIOS</strong> with an unused EFI System Partition mounted at
+<code>/boot/efi</code>.</p>
+<h4 id="where-theyre-alike">Where They're Alike</h4>
+<p>Worth stating plainly, because it is the larger part of the result.
+On all four machines: <strong>kernel taint 0</strong>, <strong>zero
+failed systemd units</strong>, <code>is-system-running: running</code>,
+and every PCI device with a real function had its driver bound. On all
+three clouds: <strong>zero firmware-load attempts and zero firmware
+packages</strong> — which is consistent rather than broken, because
+<code>ena</code>, <code>gve</code>, <code>mana</code>, <code>nvme</code>
+and <code>virtio</code> request no blobs.</p>
+<p>The shared noise is shared exactly:
+<code>systemd-ssh-generator</code> fails its <code>AF_VSOCK</code> probe
+every boot on all three clouds, none of which expose a working vsock
+CID.</p>
+<h4 id="cheat-sheet">Cheat Sheet</h4>
+<pre class="bash"><code># 0. pin the image to an ID, never a family
+aws ec2 describe-images --owners 136693071363 --filters &quot;Name=name,Values=debian-13-amd64-*&quot; \
+  --query &#39;sort_by(Images,&amp;CreationDate)[-1].ImageId&#39;
+gcloud compute images describe-from-family debian-13 --project debian-cloud --format=&quot;value(name)&quot;
+az vm image list --publisher Debian --offer debian-13 --sku 13-gen2 --all \
+  --query &quot;[?offer==&#39;debian-13&#39;] | sort_by(@,&amp;version)[-1].urn&quot; -o tsv
+ 
+# 1. confirm the SKU is actually offered to you before launching
+az vm list-skus -l eastus --size Standard_D2s_v7 --query &quot;[].name&quot; -o tsv
+ 
+# 2. scan BEFORE installing anything -- packages by dpkg, never by command -v
+dpkg-query -f &#39;${db:Status-Status}\n&#39; -W nvme-cli dmidecode smartmontools
+dpkg-query -f &#39;.\n&#39; -W | wc -l
+ 
+# 3. tools by an sbin-inclusive PATH, or you will invent false negatives
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin command -v nvme smartctl turbostat
+ 
+# 4. is the facility absent, or just unreadable? absent = no package will help
+ls /sys/class/hwmon /sys/class/powercap /sys/devices/system/edac 2&gt;&amp;1
+lsmod | grep -c rapl        # loaded modules + empty powercap = recoverable
+grep -m1 microcode /proc/cpuinfo   # 0xffffffff = hypervisor is masking it
+ 
+# 5. the backup GPT header, on any volume you have ever grown
+sudo dmesg | grep -i &#39;GPT:&#39;
+sudo sgdisk -e /dev/nvme0n1        # only if the mismatch persists after boot
+ 
+# 6. install Claude Code and let the machine read itself
+curl -fsSL https://claude.ai/install.sh | bash
+claude -p &quot;$(cat brief.txt)&quot; --allowedTools Bash</code></pre>
+<h4 id="summary">Summary</h4>
+<p>The goal was to find out what a stock Debian 13 cloud image knows
+about the hardware underneath it. The answer is: less than the hardware
+is willing to say, and the shortfall is different on every platform, in
+ways that a package list alone does not predict.</p>
+<p>The key to getting a usable answer was giving each machine the same
+brief and letting it read its own boot log, because the two most
+interesting findings — a broken partition table on one cloud and a
+self-correcting one on another — are the same kernel message, and only
+the machine can tell you which one it is looking at.</p>
+<p>The method's own two mistakes are in the article on purpose. Both
+were unstated assumptions, both produced confident wrong answers, and
+one of them was on the machine I know best.</p>
+<hr />
+<p><strong>Repo:</strong> <a
+href="https://github.com/xbill9/local-bench">github.com/xbill9/local-bench</a>
+— <code>docs/debian-across-clouds/</code> carries the four
+self-analyses, the pristine baseline scans, the brief, and the benchmark
+and pricing data. Every evidence file ends with a "NOT measured" section
+listing which claims are inferences rather than measurements.</p>
+</body>
+</html>
