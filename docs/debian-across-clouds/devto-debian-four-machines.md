@@ -4,7 +4,7 @@ published: false
 series: linux
 description: "The same Debian 13 on a laptop and on AWS, GCE and Azure. The cloud images ship 328-350 packages against 1,923 on metal, no firmware package at all, and no tool to read the NVMe they all boot from. Each machine was then given the same brief and asked to analyse itself. Three of them agreed. The fourth found a partition table its own resize had broken."
 tags: debian, linux, claudecode, devops
-cover_image: https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/devto-cover.16d18582.jpg
+cover_image: https://raw.githubusercontent.com/xbill9/local-bench/master/docs/debian-across-clouds/devto-cover.ce332564.jpg
 ---
 
 This article covers one afternoon of running the same Debian 13 on four machines — one laptop and three clouds — and asking each of them the same question about its own hardware.
