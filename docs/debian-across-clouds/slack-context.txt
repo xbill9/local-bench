@@ -1,0 +1,3 @@
+More Claude Code adventures. Nobody really asks what is inside a cloud Debian image, so I had Claude go and look.
+The same Debian 13 went on a laptop and on AWS, GCE and Azure. The cloud images ship 328-350 packages against 1,923 on metal, no firmware package at all, and no tool to read the NVMe they all boot from.
+Then each machine got the same brief and analysed itself. Three agreed. The fourth found a backup GPT header that its own 8 to 20 GiB volume resize had left broken — worth a look if you have ever grown an EBS volume.
