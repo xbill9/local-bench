@@ -1,0 +1,9 @@
+Four Debian 13 Boxes, One Brief: 1,923 Packages on Metal, 328 in the Cloud, and the Backup GPT Header Nobody Relocated
+
+The same Debian 13 on a laptop and on AWS, GCE and Azure. The cloud images ship 328-350 packages against 1,923 on metal, no firmware package at all, and no tool to read the NVMe they all boot from. Each machine was then given the same brief and asked to analyse itself. Three of them agreed. The fourth found a partition table its own resize had broken.
+
+dev.to \(Google Developer Experts\): https://dev.to/gde/four-debian-13-boxes-one-brief-1923-packages-on-metal-328-in-the-cloud-and-the-backup-gpt-cc2
+dev.to \(AWS Community Builders\): https://dev.to/aws-builders/four-debian-13-boxes-one-brief-1923-packages-on-metal-328-in-the-cloud-and-the-backup-gpt-2jn9
+AWS Builder Center: https://builder.aws.com/content/3J6iyi1kbWbPjmeHQpK3EHvbtOS/four-debian-13-boxes-one-brief-1923-packages-on-metal-328-in-the-cloud-and-the-backup-gpt-header-nobody-relocated
+Medium: https://xbill999.medium.com/four-debian-13-boxes-one-brief-1-923-packages-on-metal-328-in-the-cloud-and-the-backup-gpt-045fcf84b5ca
+Source: https://github.com/xbill9/local-bench
