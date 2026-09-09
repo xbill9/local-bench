@@ -61,3 +61,29 @@ Medium variant needs `####`. Keep `##` for dev.to and Builder Center.
   file listing which claims are measured and which are still open.
 - Negative controls called out explicitly.
 Do not restate a figure that has no artifact behind it.
+
+## LinkedIn: the template is short of the real voice
+
+MEASURED 2026-09-09. `make-linkedin.py` emitted title + description + five
+labelled links. The post actually published rewrote that, and the differences
+are the template's gaps, not the author's whim:
+
+- **A personal opener before the substance.** "More Claude Code adventures. /
+  I got Claude to answer a question that nobody bothered to ask. / What is
+  really in those cloud Debian images?" The template leads with the article
+  title; the real post leads with a person and a question, and the title never
+  appears at all.
+- **One idea per paragraph, blank line between.** The template's dense
+  description paragraph was broken into four short ones.
+- **Hashtags.** `#debian #Claude #sysinternals #drivers`. The template emits
+  none; `make-slack.py` and `make-gchat.py` both handle hashtags, so LinkedIn
+  is the odd one out.
+- **Three links, not five.** dev.to (one, unlabelled by community), AWS Builder
+  Center, Medium. The repo and the second dev.to copy were dropped, and each
+  link sits under its own label on its own line.
+- **LinkedIn rewrites URLs to lnkd.in** on posting, so the links in the
+  published post are shortened whatever you paste.
+
+If the template is updated, the shape to match is: hook line, question, three
+to four short paragraphs, "Write ups are here:", labelled links one per line,
+hashtags last.

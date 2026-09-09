@@ -3,3 +3,4 @@ medium = https://xbill999.medium.com/four-debian-13-boxes-one-brief-1-923-packag
 devto-aws = https://dev.to/aws-builders/four-debian-13-boxes-one-brief-1923-packages-on-metal-328-in-the-cloud-and-the-backup-gpt-2jn9
 devto-gde = https://dev.to/gde/four-debian-13-boxes-one-brief-1923-packages-on-metal-328-in-the-cloud-and-the-backup-gpt-cc2
 repo = https://github.com/xbill9/local-bench
+linkedin = https://www.linkedin.com/posts/xbill_debian-claude-sysinternals-share-7503572326894944256-yYc5
