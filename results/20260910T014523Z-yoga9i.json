@@ -1,0 +1,365 @@
+{
+  "schema": 1,
+  "run_id": "20260910T014523Z-yoga9i",
+  "tag": "baseline-v2",
+  "started_utc": "2026-09-10T01:45:23Z",
+  "finished_utc": "2026-09-10T01:48:55Z",
+  "config": { "reps": 3, "duration_sec": 3, "cooldown_sec": 1 },
+  "host": {
+    "hostname": "yoga9i",
+    "os": "Debian GNU/Linux 13 (trixie)",
+    "kernel": "7.1.8+deb13-amd64",
+    "arch": "x86_64",
+    "cpu_model": "Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz",
+    "cpu_threads": 12,
+    "cpu_cores": 6,
+    "cpu_mhz_max": 5000,
+    "cpu_governor": "performance",
+    "cpu_flags_notable": "avx2 sse4.2",
+    "mem_total_mib": 15658,
+    "mem_avail_mib": 10796,
+    "swap_total_mib": 16047,
+    "virt": "none",
+    "uptime_sec": 20452,
+    "loadavg_1m": 0.10,
+    "compiler": "cc (Debian 14.2.0-19) 14.2.0",
+    "compile_flags": "-O2 -march=native -pipe",
+    "root_fs": "ext4",
+    "root_dev": "/dev/nvme0n1p2",
+    "gpu_name": "NVIDIA GeForce GTX 1650 Ti with Max-Q Design",
+    "gpu_mem": "4096 MiB",
+    "gpu_driver": "615.71.09",
+    "cpu_multi_threads": 12,
+    "mem_bench_buffer_mib": 512,
+    "disk_test_dir": "/home/xbill/local-bench/.disktmp",
+    "disk_test_mib": 512,
+    "disk_io_mode": "O_DIRECT",
+    "openssl_version": "OpenSSL 3.5.7 9 Jun 2026 (Library: OpenSSL 3.5.7 9 Jun 2026)",
+    "gpu_clock_max_mhz": 2100,
+    "cpu_temp_start_c": 53,
+    "cpu_temp_end_c": 78,
+    "throttle_events": 4256,
+    "bench_tool_version": 1
+  },
+  "suites": {
+    "sysinfo": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+      }
+    },
+    "cpu-single": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+        "int": {
+          "unit": "ops/s",
+          "higher_is_better": true,
+          "median": 5.13902e+08,
+          "mean": 5.13939e+08,
+          "min": 5.13452e+08,
+          "max": 5.14463e+08,
+          "spread_pct": 0.197,
+          "n": 3,
+          "samples": [5.13452e+08, 5.13902e+08, 5.14463e+08]
+        },
+        "float": {
+          "unit": "ops/s",
+          "higher_is_better": true,
+          "median": 2.3132e+09,
+          "mean": 2.31429e+09,
+          "min": 2.30722e+09,
+          "max": 2.32244e+09,
+          "spread_pct": 0.658,
+          "n": 3,
+          "samples": [2.30722e+09, 2.3132e+09, 2.32244e+09]
+        },
+        "sieve": {
+          "unit": "ops/s",
+          "higher_is_better": true,
+          "median": 5.77014e+08,
+          "mean": 5.78348e+08,
+          "min": 5.64549e+08,
+          "max": 5.9348e+08,
+          "spread_pct": 5.014,
+          "n": 3,
+          "samples": [5.64549e+08, 5.77014e+08, 5.9348e+08]
+        }
+      }
+    },
+    "cpu-multi": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+        "threads_1": {
+          "unit": "ops/s",
+          "higher_is_better": true,
+          "median": 5.15021e+08,
+          "mean": 5.19523e+08,
+          "min": 5.14701e+08,
+          "max": 5.28847e+08,
+          "spread_pct": 2.747,
+          "n": 3,
+          "samples": [5.14701e+08, 5.15021e+08, 5.28847e+08]
+        },
+        "threads_all": {
+          "unit": "ops/s",
+          "higher_is_better": true,
+          "median": 5.14773e+09,
+          "mean": 5.1418e+09,
+          "min": 5.10612e+09,
+          "max": 5.17155e+09,
+          "spread_pct": 1.271,
+          "n": 3,
+          "samples": [5.10612e+09, 5.14773e+09, 5.17155e+09]
+        },
+        "scaling_efficiency": {
+          "unit": "%",
+          "higher_is_better": true,
+          "median": 83.293,
+          "mean": 83.293,
+          "min": 83.293,
+          "max": 83.293,
+          "spread_pct": 0.000,
+          "n": 1,
+          "samples": [83.293]
+        }
+      }
+    },
+    "memory": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+        "read": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 15.3831,
+          "mean": 15.3543,
+          "min": 15.199,
+          "max": 15.4809,
+          "spread_pct": 1.833,
+          "n": 3,
+          "samples": [15.199, 15.3831, 15.4809]
+        },
+        "write": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 12.3394,
+          "mean": 12.3238,
+          "min": 12.2082,
+          "max": 12.4238,
+          "spread_pct": 1.747,
+          "n": 3,
+          "samples": [12.2082, 12.3394, 12.4238]
+        },
+        "copy": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 24.8945,
+          "mean": 25.2264,
+          "min": 24.8702,
+          "max": 25.9145,
+          "spread_pct": 4.195,
+          "n": 3,
+          "samples": [24.8702, 24.8945, 25.9145]
+        },
+        "triad": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 13.8073,
+          "mean": 13.8339,
+          "min": 13.7626,
+          "max": 13.9318,
+          "spread_pct": 1.225,
+          "n": 3,
+          "samples": [13.7626, 13.8073, 13.9318]
+        },
+        "latency": {
+          "unit": "ns",
+          "higher_is_better": false,
+          "median": 63.5113,
+          "mean": 63.2629,
+          "min": 62.5424,
+          "max": 63.7349,
+          "spread_pct": 1.878,
+          "n": 3,
+          "samples": [62.5424, 63.5113, 63.7349]
+        }
+      }
+    },
+    "disk": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+        "seq_write": {
+          "unit": "MB/s",
+          "higher_is_better": true,
+          "median": 2500,
+          "mean": 2500,
+          "min": 2500,
+          "max": 2500,
+          "spread_pct": 0.000,
+          "n": 3,
+          "samples": [2500, 2500, 2500]
+        },
+        "seq_read": {
+          "unit": "MB/s",
+          "higher_is_better": true,
+          "median": 2500,
+          "mean": 2500,
+          "min": 2500,
+          "max": 2500,
+          "spread_pct": 0.000,
+          "n": 3,
+          "samples": [2500, 2500, 2500]
+        },
+        "fsync_latency": {
+          "unit": "ms",
+          "higher_is_better": false,
+          "median": 3.45112,
+          "mean": 3.52365,
+          "min": 3.43185,
+          "max": 3.68797,
+          "spread_pct": 7.421,
+          "n": 3,
+          "samples": [3.43185, 3.45112, 3.68797]
+        }
+      }
+    },
+    "crypto": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+        "sha256": {
+          "unit": "MB/s",
+          "higher_is_better": true,
+          "median": 578.86,
+          "mean": 574.487,
+          "min": 564.82,
+          "max": 579.78,
+          "spread_pct": 2.584,
+          "n": 3,
+          "samples": [564.82, 578.86, 579.78]
+        },
+        "aes_256_cbc": {
+          "unit": "MB/s",
+          "higher_is_better": true,
+          "median": 1277.24,
+          "mean": 1277.46,
+          "min": 1275.05,
+          "max": 1280.09,
+          "spread_pct": 0.395,
+          "n": 3,
+          "samples": [1275.05, 1277.24, 1280.09]
+        }
+      }
+    },
+    "gpu": {
+      "status": "ok",
+      "note": "",
+      "metrics": {
+        "h2d": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 11.6645,
+          "mean": 11.6459,
+          "min": 11.6075,
+          "max": 11.6659,
+          "spread_pct": 0.501,
+          "n": 3,
+          "samples": [11.6075, 11.6645, 11.6659]
+        },
+        "d2h": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 10.7043,
+          "mean": 10.667,
+          "min": 10.5787,
+          "max": 10.7181,
+          "spread_pct": 1.303,
+          "n": 3,
+          "samples": [10.5787, 10.7043, 10.7181]
+        },
+        "d2d": {
+          "unit": "GiB/s",
+          "higher_is_better": true,
+          "median": 130.429,
+          "mean": 130.431,
+          "min": 130.403,
+          "max": 130.462,
+          "spread_pct": 0.046,
+          "n": 3,
+          "samples": [130.403, 130.429, 130.462]
+        },
+        "fp32": {
+          "unit": "GFLOPS",
+          "higher_is_better": true,
+          "median": 3368.17,
+          "mean": 3364.13,
+          "min": 3352.65,
+          "max": 3371.58,
+          "spread_pct": 0.562,
+          "n": 3,
+          "samples": [3352.65, 3368.17, 3371.58]
+        },
+        "sm_clock_under_load": {
+          "unit": "MHz",
+          "higher_is_better": true,
+          "median": 1860,
+          "mean": 1860,
+          "min": 1860,
+          "max": 1860,
+          "spread_pct": 0.000,
+          "n": 1,
+          "samples": [1860]
+        },
+        "power_under_load": {
+          "unit": "W",
+          "higher_is_better": true,
+          "median": 17.15,
+          "mean": 17.15,
+          "min": 17.15,
+          "max": 17.15,
+          "spread_pct": 0.000,
+          "n": 1,
+          "samples": [17.15]
+        },
+        "temp_under_load": {
+          "unit": "C",
+          "higher_is_better": false,
+          "median": 58,
+          "mean": 58,
+          "min": 58,
+          "max": 58,
+          "spread_pct": 0.000,
+          "n": 1,
+          "samples": [58]
+        }
+      }
+    },
+    "network": {
+      "status": "ok",
+      "note": "local checks only; re-run with --net for external latency",
+      "metrics": {
+        "pipe_throughput": {
+          "unit": "MB/s",
+          "higher_is_better": true,
+          "median": 4100,
+          "mean": 4133.33,
+          "min": 4000,
+          "max": 4300,
+          "spread_pct": 7.317,
+          "n": 3,
+          "samples": [4000, 4100, 4300]
+        }
+      }
+    },
+    "claude": {
+      "status": "skip",
+      "note": "not requested; re-run with --claude",
+      "metrics": {
+      }
+    }
+  },
+  "warnings": ["CPU thermal throttling occurred during this run (4256 events); treat CPU figures as a floor"]
+}
