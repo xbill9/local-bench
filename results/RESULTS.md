@@ -12,7 +12,7 @@ too noisy for that number to be worth comparing.
 
 | host | os | platform | cpu | threads | mem MiB | gpu | runs | latest run |
 |---|---|---|---|---|---|---|---|---|
-| yoga9i | Debian GNU/Linux 13 (trixie) | bare metal | Intel Core i7-10750H | 12 | 15663 | NVIDIA GeForce GTX 1650 Ti with Max-Q Design | 3 | `20260904T141502Z-yoga9i` |
+| yoga9i | Debian GNU/Linux 13 (trixie) | bare metal | Intel Core i7-10750H | 12 | 15658 | NVIDIA GeForce GTX 1650 Ti with Max-Q Design | 4 | `20260910T013807Z-yoga9i` |
 | debian | Debian GNU/Linux 13 (trixie) | bare metal | 13th Gen Intel Core i7-1360P | 16 | 15731 | - | 2 | `20260909T182944Z-debian` |
 | ip-172-31-9-2 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T173205Z-ip-172-31-9-2` |
 | ip-172-31-6-191 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T181947Z-ip-172-31-6-191` |
@@ -32,6 +32,7 @@ too noisy for that number to be worth comparing.
 | `20260909T182313Z-baseline-pristine-azure` | 2026-09-09T18:23:13Z | baseline-pristine-azure | - | 3 | 3 | 7 | 2 | 0 |
 | `20260909T182643Z-baseline-pristine-gce` | 2026-09-09T18:26:43Z | baseline-pristine-gce | - | 3 | 3 | 7 | 2 | 0 |
 | `20260909T182944Z-debian` | 2026-09-09T18:29:44Z | debian | - | 3 | 3 | 7 | 2 | 0 |
+| `20260910T013807Z-yoga9i` | 2026-09-10T01:38:07Z | yoga9i | - | 3 | 3 | 8 | 1 | 0 |
 
 ## Measurements
 
@@ -220,6 +221,30 @@ too noisy for that number to be worth comparing.
 | `20260909T182944Z-debian` | debian | crypto | sha256 | 2387.65 | MB/s | ^ | 0.7 | 3 |
 | `20260909T182944Z-debian` | debian | crypto | aes_256_cbc | 1764.02 | MB/s | ^ | 0.3 | 3 |
 | `20260909T182944Z-debian` | debian | network | pipe_throughput | 4600 | MB/s | ^ | 28.3 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | cpu-single | int | 5.10494e+08 | ops/s | ^ | 0.4 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | cpu-single | float | 4.60101e+09 | ops/s | ^ | 1.1 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | cpu-single | sieve | 6.19341e+08 | ops/s | ^ | 1.4 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | cpu-multi | threads_1 | 5.2088e+08 | ops/s | ^ | 1.8 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | cpu-multi | threads_all | 5.10439e+09 | ops/s | ^ | 1.8 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | cpu-multi | scaling_efficiency | 81.663 | % | ^ | 0.0 | 1 |
+| `20260910T013807Z-yoga9i` | yoga9i | memory | read | 22.2376 | GiB/s | ^ | 1.7 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | memory | write | 11.9229 | GiB/s | ^ | 1.0 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | memory | copy | 25.1189 | GiB/s | ^ | 4.2 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | memory | triad | 13.5205 | GiB/s | ^ | 1.0 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | memory | latency | 64.5834 | ns | v | 3.2 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | disk | seq_write | 2500 | MB/s | ^ | 4.0 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | disk | seq_read | 2500 | MB/s | ^ | 8.0 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | disk | fsync_latency | 3.38751 | ms | v | 0.6 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | crypto | sha256 | 555.31 | MB/s | ^ | 3.7 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | crypto | aes_256_cbc | 1269.23 | MB/s | ^ | 1.6 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | h2d | 11.5608 | GiB/s | ^ | 0.2 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | d2h | 10.5748 | GiB/s | ^ | 1.0 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | d2d | 130.401 | GiB/s | ^ | 0.0 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | fp32 | 3370.66 | GFLOPS | ^ | 0.4 | 3 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | sm_clock_under_load | 1860 | MHz | ^ | 0.0 | 1 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | power_under_load | 17.1 | W | ^ | 0.0 | 1 |
+| `20260910T013807Z-yoga9i` | yoga9i | gpu | temp_under_load | 58 | C | v | 0.0 | 1 |
+| `20260910T013807Z-yoga9i` | yoga9i | network | pipe_throughput | 4000 | MB/s | ^ | 2.5 | 3 |
 
 ## Warnings
 
@@ -232,3 +257,4 @@ too noisy for that number to be worth comparing.
 | `20260904T140830Z` | 3264 MiB of swap is in use; memory results may reflect paging |
 | `20260904T140830Z` | CPU thermally throttled 5918 times during this run; CPU and memory figures are capped by cooling |
 | `20260904T141502Z-yoga9i` | CPU thermal throttling occurred during this run (2926 events); treat CPU figures as a floor |
+| `20260910T013807Z-yoga9i` | CPU thermal throttling occurred during this run (3598 events); treat CPU figures as a floor |
