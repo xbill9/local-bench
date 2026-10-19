@@ -18,6 +18,7 @@ too noisy for that number to be worth comparing.
 | ip-172-31-6-191 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T181947Z-ip-172-31-6-191` |
 | baseline-pristine-azure | Debian GNU/Linux 13 (trixie) | microsoft | Intel Xeon 6973P-C | 2 | 7942 | - | 1 | `20260909T182313Z-baseline-pristine-azure` |
 | baseline-pristine-gce | Debian GNU/Linux 13 (trixie) | google | INTEL XEON PLATINUM 8581C | 2 | 6936 | - | 1 | `20260909T182643Z-baseline-pristine-gce` |
+| samsung13 | Debian GNU/Linux forky/sid | bare metal | 13th Gen Intel Core i5-1340P | 16 | 7630 | - | 2 | `20261019T180538Z-samsung13` |
 
 ## Runs
 
@@ -37,7 +38,9 @@ too noisy for that number to be worth comparing.
 | `20260910T131757Z-debian` | 2026-09-10T13:17:57Z | debian | - | 3 | 3 | 7 | 2 | 0 |
 | `20260913T202927Z-debian` | 2026-09-13T20:29:27Z | debian | - | 3 | 3 | 7 | 2 | 0 |
 | `20260915T224118Z-yoga9i` | 2026-09-15T22:41:18Z | yoga9i | - | 3 | 3 | 7 | 2 | 0 |
+| `20261019T175612Z-samsung13` | 2026-10-19T17:56:12Z | samsung13 | - | 3 | 3 | 7 | 2 | 0 |
 | `20261019T175734Z-yoga9i` | 2026-10-19T17:57:34Z | yoga9i | - | 3 | 3 | 7 | 2 | 0 |
+| `20261019T180538Z-samsung13` | 2026-10-19T18:05:38Z | samsung13 | - | 3 | 3 | 7 | 2 | 0 |
 
 ## Measurements
 
@@ -325,6 +328,23 @@ too noisy for that number to be worth comparing.
 | `20260915T224118Z-yoga9i` | yoga9i | crypto | sha256 | 2371.68 | MB/s | ^ | 0.8 | 3 |
 | `20260915T224118Z-yoga9i` | yoga9i | crypto | aes_256_cbc | 1762.77 | MB/s | ^ | 0.5 | 3 |
 | `20260915T224118Z-yoga9i` | yoga9i | network | pipe_throughput | 4800 | MB/s | ^ | 12.5 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | cpu-single | int | 2.53888e+08 | ops/s | ^ | 0.3 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | cpu-single | float | 2.29129e+09 | ops/s | ^ | 0.4 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | cpu-single | sieve | 2.85706e+08 | ops/s | ^ | 2.7 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | cpu-multi | threads_1 | 2.54256e+08 | ops/s | ^ | 0.7 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | cpu-multi | threads_all | 2.88491e+09 | ops/s | ^ | 2.6 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | cpu-multi | scaling_efficiency | 70.916 | % | ^ | 0.0 | 1 |
+| `20261019T175612Z-samsung13` | samsung13 | memory | read | 11.7886 | GiB/s | ^ | 1.0 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | memory | write | 9.79199 | GiB/s | ^ | 17.3 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | memory | copy | 24.3281 | GiB/s | ^ | 1.6 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | memory | triad | 16.7151 | GiB/s | ^ | 2.7 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | memory | latency | 187.092 | ns | v | 2.2 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | disk | seq_write | 1600 | MB/s | ^ | 18.8 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | disk | seq_read | 3700 | MB/s | ^ | 27.0 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | disk | fsync_latency | 0.50723 | ms | v | 28.5 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | crypto | sha256 | 1106.98 | MB/s | ^ | 0.5 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | crypto | aes_256_cbc | 820.49 | MB/s | ^ | 0.9 | 3 |
+| `20261019T175612Z-samsung13` | samsung13 | network | pipe_throughput | 1900 | MB/s | ^ | 5.3 | 3 |
 | `20261019T175734Z-yoga9i` | yoga9i | cpu-single | int | 5.345e+08 | ops/s | ^ | 2.6 | 3 |
 | `20261019T175734Z-yoga9i` | yoga9i | cpu-single | float | 4.50889e+09 | ops/s | ^ | 8.0 | 3 |
 | `20261019T175734Z-yoga9i` | yoga9i | cpu-single | sieve | 5.85975e+08 | ops/s | ^ | 5.2 | 3 |
@@ -342,6 +362,23 @@ too noisy for that number to be worth comparing.
 | `20261019T175734Z-yoga9i` | yoga9i | crypto | sha256 | 2281.6 | MB/s | ^ | 2.7 | 3 |
 | `20261019T175734Z-yoga9i` | yoga9i | crypto | aes_256_cbc | 1710.68 | MB/s | ^ | 2.4 | 3 |
 | `20261019T175734Z-yoga9i` | yoga9i | network | pipe_throughput | 2200 | MB/s | ^ | 4.5 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | cpu-single | int | 5.07992e+08 | ops/s | ^ | 0.2 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | cpu-single | float | 4.56856e+09 | ops/s | ^ | 0.1 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | cpu-single | sieve | 5.73051e+08 | ops/s | ^ | 0.6 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | cpu-multi | threads_1 | 5.06194e+08 | ops/s | ^ | 0.7 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | cpu-multi | threads_all | 4.33837e+09 | ops/s | ^ | 46.8 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | cpu-multi | scaling_efficiency | 53.566 | % | ^ | 0.0 | 1 |
+| `20261019T180538Z-samsung13` | samsung13 | memory | read | 18.4969 | GiB/s | ^ | 2.7 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | memory | write | 12.7473 | GiB/s | ^ | 0.6 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | memory | copy | 33.2946 | GiB/s | ^ | 5.5 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | memory | triad | 20.3837 | GiB/s | ^ | 2.2 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | memory | latency | 120.998 | ns | v | 2.2 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | disk | seq_write | 3000 | MB/s | ^ | 10.0 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | disk | seq_read | 4300 | MB/s | ^ | 11.6 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | disk | fsync_latency | 0.39824 | ms | v | 22.6 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | crypto | sha256 | 2202.07 | MB/s | ^ | 0.2 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | crypto | aes_256_cbc | 1619.74 | MB/s | ^ | 7.9 | 3 |
+| `20261019T180538Z-samsung13` | samsung13 | network | pipe_throughput | 4200 | MB/s | ^ | 9.5 | 3 |
 
 ## Warnings
 
@@ -358,3 +395,4 @@ too noisy for that number to be worth comparing.
 | `20260910T014523Z-yoga9i` | CPU thermal throttling occurred during this run (4256 events); treat CPU figures as a floor |
 | `20260910T131757Z-debian` | CPU thermal throttling occurred during this run (11688 events); treat CPU figures as a floor |
 | `20260913T202927Z-debian` | CPU thermal throttling occurred during this run (8522 events); treat CPU figures as a floor |
+| `20261019T180538Z-samsung13` | CPU thermal throttling occurred during this run (2758 events); treat CPU figures as a floor |
