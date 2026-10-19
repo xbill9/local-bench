@@ -12,7 +12,7 @@ too noisy for that number to be worth comparing.
 
 | host | os | platform | cpu | threads | mem MiB | gpu | runs | latest run |
 |---|---|---|---|---|---|---|---|---|
-| yoga9i | Debian GNU/Linux 13 (trixie) | container-other | 13th Gen Intel Core i7-1360P | 16 | 15731 | NVIDIA GeForce GTX 1650 Ti with Max-Q Design | 6 | `20260915T224118Z-yoga9i` |
+| yoga9i | Debian GNU/Linux forky/sid | bare metal | 13th Gen Intel Core i7-1360P | 16 | 15732 | NVIDIA GeForce GTX 1650 Ti with Max-Q Design | 7 | `20261019T175734Z-yoga9i` |
 | debian | Debian GNU/Linux 13 (trixie) | bare metal | 13th Gen Intel Core i5-1335U | 12 | 5649 | - | 4 | `20260913T202927Z-debian` |
 | ip-172-31-9-2 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T173205Z-ip-172-31-9-2` |
 | ip-172-31-6-191 | Debian GNU/Linux 13 (trixie) | amazon | Intel Xeon Platinum 8488C | 2 | 3826 | - | 1 | `20260909T181947Z-ip-172-31-6-191` |
@@ -37,6 +37,7 @@ too noisy for that number to be worth comparing.
 | `20260910T131757Z-debian` | 2026-09-10T13:17:57Z | debian | - | 3 | 3 | 7 | 2 | 0 |
 | `20260913T202927Z-debian` | 2026-09-13T20:29:27Z | debian | - | 3 | 3 | 7 | 2 | 0 |
 | `20260915T224118Z-yoga9i` | 2026-09-15T22:41:18Z | yoga9i | - | 3 | 3 | 7 | 2 | 0 |
+| `20261019T175734Z-yoga9i` | 2026-10-19T17:57:34Z | yoga9i | - | 3 | 3 | 7 | 2 | 0 |
 
 ## Measurements
 
@@ -324,6 +325,23 @@ too noisy for that number to be worth comparing.
 | `20260915T224118Z-yoga9i` | yoga9i | crypto | sha256 | 2371.68 | MB/s | ^ | 0.8 | 3 |
 | `20260915T224118Z-yoga9i` | yoga9i | crypto | aes_256_cbc | 1762.77 | MB/s | ^ | 0.5 | 3 |
 | `20260915T224118Z-yoga9i` | yoga9i | network | pipe_throughput | 4800 | MB/s | ^ | 12.5 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | cpu-single | int | 5.345e+08 | ops/s | ^ | 2.6 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | cpu-single | float | 4.50889e+09 | ops/s | ^ | 8.0 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | cpu-single | sieve | 5.85975e+08 | ops/s | ^ | 5.2 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | cpu-multi | threads_1 | 5.36817e+08 | ops/s | ^ | 2.9 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | cpu-multi | threads_all | 6.14261e+09 | ops/s | ^ | 0.3 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | cpu-multi | scaling_efficiency | 71.517 | % | ^ | 0.0 | 1 |
+| `20261019T175734Z-yoga9i` | yoga9i | memory | read | 17.4974 | GiB/s | ^ | 8.2 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | memory | write | 14.1616 | GiB/s | ^ | 0.6 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | memory | copy | 43.2758 | GiB/s | ^ | 4.3 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | memory | triad | 23.111 | GiB/s | ^ | 6.1 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | memory | latency | 116.688 | ns | v | 0.2 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | disk | seq_write | 1200 | MB/s | ^ | 0.0 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | disk | seq_read | 2600 | MB/s | ^ | 7.7 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | disk | fsync_latency | 0.80569 | ms | v | 41.8 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | crypto | sha256 | 2281.6 | MB/s | ^ | 2.7 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | crypto | aes_256_cbc | 1710.68 | MB/s | ^ | 2.4 | 3 |
+| `20261019T175734Z-yoga9i` | yoga9i | network | pipe_throughput | 2200 | MB/s | ^ | 4.5 | 3 |
 
 ## Warnings
 
